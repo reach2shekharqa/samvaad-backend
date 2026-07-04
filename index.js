@@ -5,7 +5,7 @@ const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
-
+const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
@@ -153,6 +153,6 @@ app.get("/repo/:sessionId/:repoName", (req, res) => {
 /**
  * START SERVER
  */
-app.listen(3000, "0.0.0.0", () => {
-    console.log("Backend running on http://0.0.0.0:3000");
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Backend running on port ${PORT}`);
 });
