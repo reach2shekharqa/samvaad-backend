@@ -1,19 +1,30 @@
-const express = require("express");
-const axios = require("axios");
-const cors = require("cors");
-const crypto = require("crypto");
-require("dotenv").config();
+import express from "express";
+import axios from "axios";
+import cors from "cors";
+import crypto from "crypto";
+import dotenv from "dotenv";
+
+import aiRoutes from "./routes/ai.js";
+import sessions from "./store/sessionStore.js";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
 app.use(cors());
 app.use(express.json());
+
+// ----------------------
+// AI Routes
+// ----------------------
+app.use("/ai", aiRoutes);
 
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
 // TEMP SESSION STORE (DEV ONLY)
-const sessions = {};
+// const sessions = {};
 
 /**
  * START OAUTH
@@ -33,12 +44,15 @@ app.get("/auth/github", (req, res) => {
 app.get("/auth/github/callback", async (req, res) => {
 
     const code = req.query.code;
-    if (!code) return res.status(400).send("Missing code");
+
+    if (!code) {
+        return res.status(400).send("Missing code");
+    }
 
     try {
 
-        // FIXED TOKEN EXCHANGE (IMPORTANT)
         const params = new URLSearchParams();
+
         params.append("client_id", CLIENT_ID);
         params.append("client_secret", CLIENT_SECRET);
         params.append("code", code);
@@ -60,14 +74,17 @@ app.get("/auth/github/callback", async (req, res) => {
             return res.status(400).send("Token exchange failed");
         }
 
-        // USER INFO
-        const userResponse = await axios.get("https://api.github.com/user", {
-            headers: {
-                Authorization: `Bearer ${accessToken}`
+        // USER
+        const userResponse = await axios.get(
+            "https://api.github.com/user",
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`
+                }
             }
-        });
+        );
 
-        // REPOS
+        // REPOSITORIES
         const repoResponse = await axios.get(
             "https://api.github.com/user/repos?per_page=100",
             {
@@ -77,7 +94,7 @@ app.get("/auth/github/callback", async (req, res) => {
             }
         );
 
-        // SESSION ID
+        // CREATE SESSION
         const sessionId = crypto.randomUUID();
 
         sessions[sessionId] = {
@@ -88,17 +105,19 @@ app.get("/auth/github/callback", async (req, res) => {
 
         console.log("LOGIN:", userResponse.data.login);
 
-        // BACK TO ANDROID
+        // RETURN TO ANDROID
         res.redirect(`samvaad://callback?sessionId=${sessionId}`);
 
     } catch (err) {
+
         console.error(err.response?.data || err.message);
+
         res.status(500).send("OAuth failed");
     }
 });
 
 /**
- * GET SESSION DATA
+ * SESSION
  */
 app.get("/auth/session/:sessionId", (req, res) => {
 
@@ -116,29 +135,30 @@ app.get("/auth/session/:sessionId", (req, res) => {
         user: session.user,
         repos: session.repos
     });
+
 });
 
 /**
- * HEALTH CHECK
+ * GET REPOSITORY DETAILS
  */
-app.get("/", (req, res) => {
-    res.send("Samvaad Backend Running");
-});
-
 app.get("/repo/:sessionId/:repoName", (req, res) => {
 
     const session = sessions[req.params.sessionId];
 
     if (!session) {
-        return res.status(404).json({ error: "Invalid session" });
+        return res.status(404).json({
+            error: "Invalid session"
+        });
     }
 
-    const repoName = req.params.repoName;
-
-    const repo = session.repos.find(r => r.name === repoName);
+    const repo = session.repos.find(
+        r => r.name === req.params.repoName
+    );
 
     if (!repo) {
-        return res.status(404).json({ error: "Repo not found" });
+        return res.status(404).json({
+            error: "Repo not found"
+        });
     }
 
     res.json({
@@ -148,11 +168,19 @@ app.get("/repo/:sessionId/:repoName", (req, res) => {
         language: repo.language,
         stars: repo.stargazers_count
     });
+
+});
+
+/**
+ * HEALTH
+ */
+app.get("/", (req, res) => {
+    res.send("Samvaad Backend Running 🚀");
 });
 
 /**
  * START SERVER
  */
 app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Backend running on port ${PORT}`);
+    console.log(`🚀 Backend running on port ${PORT}`);
 });
