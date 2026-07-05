@@ -48,7 +48,9 @@ router.post("/chat", async (req, res) => {
             sessionId,
             githubToken: session.token,
             user: session.user,
-            repository
+            repository,
+
+            repositoryPath: "D:/samvaad-backend"
         });
 
         // Invoke graph
@@ -56,6 +58,8 @@ router.post("/chat", async (req, res) => {
 
         res.json({
             success: true,
+            plan: result.plan,
+            toolResults: result.toolResults,
             answer: result.response
         });
 

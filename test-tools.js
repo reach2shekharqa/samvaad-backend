@@ -1,50 +1,60 @@
 import toolManager from "./tools/ToolManager.js";
-import { ToolNode } from "./agent/nodes/ToolNode.js";
 import readReadmeTool from "./tools/readReadmeTool.js";
+
+import { plannerNode } from "./agent/nodes/plannerNode.js";
+import { ToolNode } from "./agent/nodes/ToolNode.js";
 import responseAgent from "./agent/agents/ResponseAgent.js";
 
-// register tool
+// Register tools
 toolManager.register(readReadmeTool);
 
-// create node
+// Create ToolNode
 const toolNode = new ToolNode(toolManager);
 
-// state
+// Initial state
 let state = {
-  input: "read repo readme and explain it",
-  plan: {
-    actions: [
-      {
-        toolName: "readReadmeTool",
-        input: {
-          repositoryPath: "D:/samvaad-backend"
+    input: "Explain this repository",
+
+    plan: null,
+
+    toolResults: [],
+
+    response: "",
+
+    context: {
+        repositoryPath: "D:/samvaad-backend",
+
+        repository: {
+            name: "samvaad-backend",
+            full_name: "samvaad/backend",
+            language: "JavaScript",
+            description: "AI agent backend system"
         }
-      }
-    ]
-  },
-  toolResults: [],
-  response: "",
-  context: {
-    repository: {
-      name: "samvaad-backend",
-      full_name: "samvaad/backend",
-      language: "JavaScript",
-      description: "AI agent backend system"
     }
-  }
 };
 
 async function run() {
 
-  // STEP 1: tools
-  state = await toolNode.execute(state);
+    console.log("\n========== INITIAL STATE ==========\n");
+    console.log(JSON.stringify(state, null, 2));
 
-  // STEP 2: brain (THIS WAS MISSING)
-  state.response = await responseAgent.generate(state);
+    // STEP 1 - Planner
+    state = await plannerNode(state);
 
-  // FINAL OUTPUT
-  console.log("\n===== FINAL RESPONSE =====\n");
-  console.log(state.response);
+    console.log("\n========== PLAN ==========\n");
+    console.log(JSON.stringify(state.plan, null, 2));
+
+    // STEP 2 - Tool Execution
+    state = await toolNode.execute(state);
+
+    console.log("\n========== TOOL RESULTS ==========\n");
+    console.log(JSON.stringify(state.toolResults, null, 2));
+
+    // STEP 3 - Response Generation
+    state.response = await responseAgent.generate(state);
+
+    console.log("\n========== FINAL RESPONSE ==========\n");
+    console.log(state.response);
 }
 
 run();

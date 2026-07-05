@@ -11,6 +11,9 @@ export const createInitialState = (input, context = {}) => ({
         sessionId: context.sessionId || "",
         githubToken: context.githubToken || "",
         user: context.user || null,
-        repository: context.repository || null
+        repository: context.repository || null,
+
+        // NEW
+        repositoryPath: context.repositoryPath || ""
     }
 });
