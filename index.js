@@ -31,7 +31,7 @@ app.use((req, res, next) => {
         try {
             if (safeBody.github && safeBody.github.token) safeBody.github.token = "***REDACTED***";
             if (safeBody.token) safeBody.token = "***REDACTED***";
-        } catch (e) {}
+        } catch (e) { }
 
         console.log("\n🔥 AI REQUEST:", req.method, req.url);
         console.log("BODY:", safeBody);
@@ -50,14 +50,27 @@ const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 // TEMP SESSION STORE (DEV ONLY)
 // const sessions = {};
 
+app.get("/auth/logout/:sessionId", async (req, res) => {
+    try {
+        await sessionStore.delete(req.params.sessionId);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false });
+    }
+});
+
 /**
  * START OAUTH
  */
 app.get("/auth/github", (req, res) => {
+
+    const prompt = req.query.prompt || "select_account";
+
     const url =
         "https://github.com/login/oauth/authorize" +
         `?client_id=${CLIENT_ID}` +
-        "&scope=read:user repo";
+        "&scope=read:user repo" +
+        `&prompt=${prompt}`;
 
     res.redirect(url);
 });
@@ -120,6 +133,7 @@ app.get("/auth/github/callback", async (req, res) => {
 
         // CREATE SESSION
         const sessionId = crypto.randomUUID();
+        await sessionStore.clearAllForUser(userResponse.data.login);
 
         await sessionStore.save(sessionId, {
             token: accessToken,
@@ -130,7 +144,14 @@ app.get("/auth/github/callback", async (req, res) => {
         // login successful; do not log user data
 
         // RETURN TO ANDROID
-        res.redirect(`samvaad://callback?sessionId=${sessionId}`);
+        const username = encodeURIComponent(userResponse.data.login);
+        const avatar = encodeURIComponent(userResponse.data.avatar_url);
+
+        res.redirect(
+            `samvaad://callback?sessionId=${sessionId}` +
+            `&username=${username}` +
+            `&avatar=${avatar}`
+        );
 
     } catch (err) {
 

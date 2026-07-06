@@ -21,6 +21,16 @@ class SessionStore {
 
     }
 
+    async clearAllForUser(username) {
+    const all = await this.getAll();
+
+    for (const [sessionId, data] of Object.entries(all)) {
+        if (data.user?.login === username) {
+            await this.delete(sessionId);
+        }
+    }
+}
+
     async saveAll(sessions) {
 
         await fs.writeFile(

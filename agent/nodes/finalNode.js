@@ -29,6 +29,10 @@ export async function finalNode(state) {
     };
   }
 
+  // Log which files were used
+  const filesUsed = evidence.relevantFiles ? Object.keys(evidence.relevantFiles) : [];
+  console.log("📄 Files used for final answer:", filesUsed.length > 0 ? filesUsed.join(", ") : "directory structure only");
+
   const result = await aiService.chat({
     systemPrompt: `
 You are a repository analyst. Answer the user's question about the repository using ONLY the provided evidence.

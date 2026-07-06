@@ -5,6 +5,10 @@ export async function toolNode(state) {
 
   const github = state.github || (state.context && state.context.github) || {};
   const userQuery = (state.input || "").toLowerCase();
+  const iteration = (state.iteration || 0);
+
+  console.log(`🔧 TOOL STEP [iteration: ${iteration}]`);
+  console.log(`❓ User Question: "${state.input || ""}"`);
 
   const structuredResults = {
     repository: {
@@ -20,7 +24,7 @@ export async function toolNode(state) {
     // 1) Discover repository structure
     console.log("DEBUG: Attempting discovery for:", { owner: github.owner, repo: github.repo });
     const discover = await discoverRepositoryTool({ github });
-    console.log("DEBUG: Discovery result success:", discover?.success, "error:", discover?.error);
+    console.log("DEBUG: Discovery result success:", discover?.success, "fromCache:", discover?.fromCache, "error:", discover?.error);
     if (discover && discover.success) {
       structuredResults.metadata = {
         totalFiles: discover.data?.totalFiles || 0,

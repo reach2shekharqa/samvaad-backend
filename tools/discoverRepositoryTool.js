@@ -1,9 +1,22 @@
 import axios from "axios";
+import discoveryCache from "./DiscoveryCache.js";
 
 export async function discoverRepositoryTool({ github }) {
 
   try {
     console.log("DEBUG: Discovering repo:", github.owner, "/", github.repo);
+
+    // Check cache first
+    const cached = discoveryCache.get(github.owner, github.repo);
+    if (cached) {
+      return {
+        success: true,
+        tool: "discoverRepositoryTool",
+        data: cached,
+        fromCache: true
+      };
+    }
+
     const repoResponse = await axios.get(
       `https://api.github.com/repos/${github.owner}/${github.repo}`,
       {
@@ -37,16 +50,22 @@ export async function discoverRepositoryTool({ github }) {
       if (item.type === "tree") directories.push(item.path);
     }
 
+    const discoveryData = {
+      defaultBranch,
+      totalFiles: files.length,
+      totalDirectories: directories.length,
+      files,
+      directories
+    };
+
+    // Cache the result
+    discoveryCache.set(github.owner, github.repo, discoveryData);
+
     return {
       success: true,
       tool: "discoverRepositoryTool",
-      data: {
-        defaultBranch,
-        totalFiles: files.length,
-        totalDirectories: directories.length,
-        files,
-        directories
-      }
+      data: discoveryData,
+      fromCache: false
     };
 
   } catch (err) {
