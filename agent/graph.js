@@ -1,40 +1,57 @@
 import { StateGraph } from "@langchain/langgraph";
 
 import { plannerNode } from "./nodes/plannerNode.js";
-import { ToolNode } from "./nodes/ToolNode.js";
-import { responseNode } from "./nodes/responseNode.js";
-
-import toolManager from "../tools/ToolManager.js";
-import readReadmeTool from "../tools/readReadmeTool.js";
-
-// Register tools once
-toolManager.register(readReadmeTool);
-
-// Create ToolNode
-const toolNode = new ToolNode(toolManager);
+import { toolNode } from "./nodes/toolNode.js";
+import { routerNode } from "./nodes/routerNode.js";
+import { finalNode } from "./nodes/finalNode.js";
 
 export function buildSamvaadGraph() {
 
-    const graph = new StateGraph({
-        channels: {
-            input: "string",
-            plan: "object",
-            toolResults: "array",
-            response: "string",
-            context: "object"
-        }
-    });
+  const graph = new StateGraph({
+    channels: {
+      input: "string",
+      context: "object",
+      iteration: "number",
+      action: "string",
+      evidence: "array",
+      finalResponse: "string"
+    }
+  });
 
-    graph.addNode("planner", plannerNode);
-    graph.addNode("tool", async (state) => toolNode.execute(state));
-    graph.addNode("response", responseNode);
+  // ---------------- NODES ----------------
+  graph.addNode("planner", plannerNode);
+  graph.addNode("tool", toolNode);
+  graph.addNode("router", routerNode);
+  graph.addNode("final", finalNode);
 
-    graph.setEntryPoint("planner");
+  // 🔥 ENTRY FIX
+  graph.setEntryPoint("planner");
 
-    graph.addEdge("planner", "tool");
-    graph.addEdge("tool", "response");
+  // normal flow
+  graph.addEdge("planner", "router");
+  graph.addEdge("tool", "router");
 
-    graph.setFinishPoint("response");
+  // final exit
+  graph.addEdge("final", "__end__");
 
-    return graph.compile();
+  // routing decision
+  graph.addConditionalEdges("router", (state) => {
+
+  if ((state.iteration || 0) >= 2) {
+    return "final";
+  }
+
+  if (state.action === "tool") {
+    return "tool";
+  }
+
+  return "planner";
+});
+
+  // ---------------- EDGES ----------------
+  graph.addEdge("planner", "router");
+  graph.addEdge("tool", "router");
+  graph.addEdge("final", "__end__");
+
+  return graph.compile();
 }

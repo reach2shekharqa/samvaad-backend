@@ -2,74 +2,83 @@ import aiService from "../ai/AIService.js";
 
 class PlannerAgent {
 
-    async plan(question, context = {}) {
+  async plan(state) {
 
-        const result = await aiService.chat({
+    state.iteration = (state.iteration || 0) + 1;
+    state.executedTools = state.executedTools || [];
 
-            systemPrompt: `
-You are Samvaad's Planning Agent.
-
-Your ONLY job is to decide which tools to execute.
-
-RULES:
-- Never answer the question
-- Only return JSON
-- Use ONLY available tools
-
-AVAILABLE TOOLS:
-
-1. readReadmeTool
-   Use for:
-   - explain repository
-   - summarize repository
-   - repository overview
-
-FORMAT:
-
-{
-  "tools": [
-    {
-      "name": "readReadmeTool",
-      "input": {}
-    }
-  ]
-}
-
-If no tool is needed:
-
-{
-  "tools": []
-}
-`,
-
-            userPrompt: `
-QUESTION:
-${question}
-
-CONTEXT:
-${JSON.stringify(context, null, 2)}
-`,
-
-            temperature: 0,
-
-            responseFormat: {
-                type: "json_object"
-            }
-
-        });
-
-        // 🔥 SAFE PARSE (important fix)
-        try {
-            return typeof result === "string"
-                ? JSON.parse(result)
-                : result;
-
-        } catch (err) {
-            console.log("Planner parse error:", result);
-
-            return { tools: [] };
+    // HARD STOP
+    if (state.iteration >= (state.maxIterations || 4)) {
+      return {
+        ...state,
+        plan: {
+          action: "finish",
+          tools: []
         }
+      };
     }
+
+    const result = await aiService.chat({
+      systemPrompt: `
+You are a JSON planner that outputs JSON only.
+
+Return ONLY valid JSON.
+
+STRICT RULES:
+- No explanations
+- No markdown
+- No backticks
+- No extra text
+- Only valid JSON object
+
+OUTPUT FORMAT (ONLY ONE OF THESE):
+
+{"action":"tool","tools":[]}
+{"action":"finish","tools":[]}
+      `.trim(),
+
+      userPrompt: `
+QUESTION: ${state.input}
+
+ITERATION: ${state.iteration}
+
+EXECUTED TOOLS:
+${JSON.stringify(state.executedTools)}
+
+EVIDENCE:
+${JSON.stringify(state.evidence || [])}
+      `.trim(),
+
+      temperature: 0,
+
+      // ✅ FIX 1: correct key
+      response_format: {
+        type: "json_object"
+      }
+    });
+
+    let parsed;
+
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      return {
+        ...state,
+        plan: {
+          action: "finish",
+          tools: []
+        }
+      };
+    }
+
+    // safety normalization
+    if (!parsed.tools) parsed.tools = [];
+
+    return {
+      ...state,
+      plan: parsed
+    };
+  }
 }
 
-export default new PlannerAgent();
+export const plannerNode = new PlannerAgent().plan;

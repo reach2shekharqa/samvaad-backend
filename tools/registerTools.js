@@ -1,15 +1,14 @@
 import toolManager from "./ToolManager.js";
 
-import readReadmeTool from "./readReadmeTool.js";
+import readFileTool from "./readFileTool.js";
+
+import discoverRepositoryTool from "./discoverRepositoryTool.js"
 
 export function registerTools() {
 
-    toolManager.register(readReadmeTool);
+    toolManager.register(readFileTool);
+    toolManager.register(discoverRepositoryTool);
 
-    console.log("✅ Registered Tools:");
-
-    toolManager.getAll().forEach(tool => {
-        console.log(`   • ${tool.name}`);
-    });
 
 }
+

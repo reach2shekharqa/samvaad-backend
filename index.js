@@ -5,15 +5,39 @@ import crypto from "crypto";
 import dotenv from "dotenv";
 
 import aiRoutes from "./routes/ai.js";
-import sessions from "./store/sessionStore.js";
+import sessionStore from "./store/SessionStore.js";
 
 dotenv.config();
 
+// Global error handlers to log unexpected crashes
+process.on("uncaughtException", (err) => {
+    console.error("UNCAUGHT EXCEPTION:", err && err.stack ? err.stack : err);
+    // keep process exiting after logging
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+    console.error("UNHANDLED REJECTION:", reason);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 app.use(cors());
 app.use(express.json());
+
+// optional request logging (disabled by default)
+app.use((req, res, next) => {
+    if (process.env.LOG_REQUESTS === "true" && req.url.startsWith("/ai")) {
+        const safeBody = JSON.parse(JSON.stringify(req.body || {}));
+        try {
+            if (safeBody.github && safeBody.github.token) safeBody.github.token = "***REDACTED***";
+            if (safeBody.token) safeBody.token = "***REDACTED***";
+        } catch (e) {}
+
+        console.log("\n🔥 AI REQUEST:", req.method, req.url);
+        console.log("BODY:", safeBody);
+    }
+    next();
+});
 
 // ----------------------
 // AI Routes
@@ -97,13 +121,13 @@ app.get("/auth/github/callback", async (req, res) => {
         // CREATE SESSION
         const sessionId = crypto.randomUUID();
 
-        sessions[sessionId] = {
+        await sessionStore.save(sessionId, {
             token: accessToken,
             user: userResponse.data,
             repos: repoResponse.data
-        };
+        });
 
-        console.log("LOGIN:", userResponse.data.login);
+        // login successful; do not log user data
 
         // RETURN TO ANDROID
         res.redirect(`samvaad://callback?sessionId=${sessionId}`);
@@ -119,9 +143,9 @@ app.get("/auth/github/callback", async (req, res) => {
 /**
  * SESSION
  */
-app.get("/auth/session/:sessionId", (req, res) => {
+app.get("/auth/session/:sessionId", async (req, res) => {
 
-    const session = sessions[req.params.sessionId];
+    const session = await sessionStore.get(req.params.sessionId);
 
     if (!session) {
         return res.status(404).json({
@@ -141,9 +165,9 @@ app.get("/auth/session/:sessionId", (req, res) => {
 /**
  * GET REPOSITORY DETAILS
  */
-app.get("/repo/:sessionId/:repoName", (req, res) => {
+app.get("/repo/:sessionId/:repoName", async (req, res) => {
 
-    const session = sessions[req.params.sessionId];
+    const session = await sessionStore.get(req.params.sessionId);
 
     if (!session) {
         return res.status(404).json({
