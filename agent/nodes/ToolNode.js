@@ -73,6 +73,36 @@ export async function toolNode(state) {
         }
       }
 
+      // Additional pass: if user explicitly asked about fixtures, search candidate files for 'fixture' mentions
+      if (/\bfixture(s)?\b/i.test(userQuery)) {
+        console.log("DEBUG: Fixture query detected — scanning for fixture implementations");
+
+        // Candidates: files that include 'fixture' in path or are JS/TS files in tests or fixtures dirs
+        const fixtureCandidates = files.filter(f => /fixture/i.test(f) || /tests\/.+\.(ts|js)$|\.spec\.(ts|js)$/i.test(f));
+
+        for (const filePath of fixtureCandidates.slice(0, 10)) {
+          try {
+            const fileContent = await readFileTool({ github, filePath });
+            if (fileContent && fileContent.success && fileContent.data?.content) {
+              const content = fileContent.data.content;
+              if (/\bfixture\b|PageFixture|fixtures\//i.test(content)) {
+                structuredResults.relevantFiles[filePath] = {
+                  path: filePath,
+                  preview: content.slice(0, 2500),
+                  size: content.length
+                };
+              }
+            }
+          } catch (err) {
+            // ignore read errors
+          }
+        }
+
+        if (Object.keys(structuredResults.relevantFiles).length > 0) {
+          console.log("DEBUG: Found fixture-related files:", Object.keys(structuredResults.relevantFiles));
+        }
+      }
+
       // 4) If no files found from patterns, fallback to README or main files
       if (Object.keys(structuredResults.relevantFiles).length === 0) {
         // Try alternative documentation files

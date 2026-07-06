@@ -61,23 +61,37 @@ router.post("/chat", async (req, res) => {
       async function detectIntent(text) {
         try {
           const result = await aiService.chat({
-            systemPrompt: `You are an intent classifier. Return ONLY valid JSON with the shape {"intent": "greeting" | "smalltalk" | "repo_question" | "other"}. Do NOT include any other text.`,
+            systemPrompt: `You are an intent classifier. Return ONLY valid JSON with the shape {"intent": "greeting" | "smalltalk" | "repo_question" | "other", "confidence": 0.0-1.0}. Do NOT include any other text.`,
             userPrompt: text,
             temperature: 0
           });
 
           const cleaned = (result || "").replace(/```/g, "").trim();
           const parsed = JSON.parse(cleaned);
-          return (parsed.intent || "").toLowerCase();
+          return { intent: (parsed.intent || "").toLowerCase(), confidence: Number(parsed.confidence) || 0 };
         } catch (e) {
           console.warn("Intent detection failed, falling back to static check:", e && e.message ? e.message : e);
-          return null;
+          return { intent: null, confidence: 0 };
         }
       }
 
       // If LLM classifies the input as a greeting or smalltalk, produce a dynamic quick reply
-      const detected = await detectIntent(safeQuestion);
-      console.log("DEBUG: Intent detected:", detected);
+      const intentResult = await detectIntent(question || "");
+      const detected = intentResult.intent;
+      const detectedConfidence = intentResult.confidence;
+      console.log("DEBUG: Intent detected:", detected, "confidence:", detectedConfidence);
+
+      // If the user recently asked about the same repo in this session, treat ambiguous inputs as repo questions
+      try {
+        const last = session.lastInteraction || {};
+        if ((detected === "other" || !detected) && last.lastIntent === "repo_question" && last.repoName === repoName) {
+          console.log("DEBUG: Overriding ambiguous intent to repo_question based on session context");
+          detected = "repo_question";
+          detectedConfidence = 0.9;
+        }
+      } catch (e) {
+        // ignore
+      }
 
       if (detected === "greeting") {
         try {
@@ -119,6 +133,70 @@ router.post("/chat", async (req, res) => {
         }
       }
 
+      // If intent is repo_question but confidence is low or the question is unclear, attempt paraphrase
+      if (detected === "repo_question") {
+        const rawQuestion = question || "";
+
+        // If confidence low or question is too short / looks like gibberish, ask LLM to paraphrase
+        const shouldParaphrase = detectedConfidence < 0.6 || rawQuestion.trim().length < 4 || /[^\w\s\?\.\!\-]/.test(rawQuestion);
+
+        if (shouldParaphrase) {
+          try {
+            const paraphrase = await aiService.chat({
+              systemPrompt: `You are a paraphrasing assistant. Rephrase the user's input into a clear, concise repository-related question. If the input is gibberish or not a repository question, return an empty string. Return ONLY the paraphrased question or empty string, no explanation.`,
+              userPrompt: rawQuestion,
+              temperature: 0.2
+            });
+
+            const cleanedParaphrase = (paraphrase || "").replace(/```/g, "").trim();
+            if (!cleanedParaphrase || cleanedParaphrase.length < 3) {
+              // Ask for clarification instead of running planner/tools
+              const clarify = await aiService.chat({
+                systemPrompt: `You are a helpful assistant. The user's question is unclear. Reply with a single short clarification request asking the user to rephrase or confirm they want a repository summary. Do NOT use markdown.`,
+                userPrompt: `User input: "${rawQuestion}"\nRepository: ${repoName || "(none)"}`,
+                temperature: 0.2
+              });
+
+              return {
+                success: true,
+                response: (clarify || "I didn't understand that. Could you rephrase your question or ask me to summarize the repository?")
+              };
+            }
+
+            // Replace safeQuestion with paraphrased clearer question for planner
+            console.log("DEBUG: Paraphrased question:", cleanedParaphrase);
+            // use cleanedParaphrase (keep original casing)
+            // update safeQuestion variable used by graph
+            // Note: state.input expects lowercased earlier, but planner can handle original casing; keep as-is
+            // We'll set a new variable for planner input later
+            var plannerInput = cleanedParaphrase;
+          } catch (e) {
+            console.warn("Paraphrase failed, proceeding with original question:", e && e.message ? e.message : e);
+          }
+        }
+      }
+
+      // If intent is explicitly 'other' (unclear / gibberish), ask for clarification instead
+      if (detected === "other") {
+        try {
+          const clarify = await aiService.chat({
+            systemPrompt: `You are a helpful assistant. The user input may be unclear. Return a single short clarification question asking the user to rephrase or confirm they want a repository summary. Do NOT include markdown or extra explanation.`,
+            userPrompt: `User input: "${question || ""}"\nRepository: ${repoName || "(none)"}`,
+            temperature: 0.2
+          });
+
+          return {
+            success: true,
+            response: (clarify || "I didn't understand that. Could you rephrase your question or ask me to summarize the repository?")
+          };
+        } catch (e) {
+          return {
+            success: true,
+            response: "I didn't understand that. Could you rephrase your question or ask me to summarize the repository?"
+          };
+        }
+      }
+
       // Fallback: if detection failed, keep old lightweight greeting check
       if (!detected && isGreeting(safeQuestion)) {
         return {
@@ -137,7 +215,7 @@ router.post("/chat", async (req, res) => {
       // GRAPH INPUT STATE
       // -----------------------------
       const initialState = {
-        input: safeQuestion,
+        input: typeof plannerInput === 'string' && plannerInput.length > 0 ? plannerInput : safeQuestion,
         context: { sessionId, repoName, github },
         github,
         plan: {},
@@ -155,6 +233,23 @@ router.post("/chat", async (req, res) => {
       // RUN GRAPH
       // -----------------------------
       const result = await graph.invoke(initialState);
+
+      // Save last interaction for session context to help follow-ups
+      try {
+        const updatedSession = {
+          ...session,
+          lastInteraction: {
+            lastIntent: "repo_question",
+            repoName,
+            question: question || safeQuestion,
+            timestamp: Date.now()
+          }
+        };
+
+        await sessionStore.save(sessionId, updatedSession);
+      } catch (e) {
+        console.warn("Failed to save session lastInteraction:", e && e.message ? e.message : e);
+      }
 
       return {
         success: true,
