@@ -1,6 +1,7 @@
 import express from "express";
 import { buildSamvaadGraph } from "../agent/graph.js";
 import sessionStore from "../store/SessionStore.js";
+import aiService from "../agent/ai/AIService.js";
 
 const router = express.Router();
 
@@ -55,9 +56,71 @@ router.post("/chat", async (req, res) => {
       }
 
       // -----------------------------
-      // HANDLE GREETING (FAST PATH)
+      // DYNAMIC INTENT DETECTION (LLM)
       // -----------------------------
-      if (isGreeting(safeQuestion)) {
+      async function detectIntent(text) {
+        try {
+          const result = await aiService.chat({
+            systemPrompt: `You are an intent classifier. Return ONLY valid JSON with the shape {"intent": "greeting" | "smalltalk" | "repo_question" | "other"}. Do NOT include any other text.`,
+            userPrompt: text,
+            temperature: 0
+          });
+
+          const cleaned = (result || "").replace(/```/g, "").trim();
+          const parsed = JSON.parse(cleaned);
+          return (parsed.intent || "").toLowerCase();
+        } catch (e) {
+          console.warn("Intent detection failed, falling back to static check:", e && e.message ? e.message : e);
+          return null;
+        }
+      }
+
+      // If LLM classifies the input as a greeting or smalltalk, produce a dynamic quick reply
+      const detected = await detectIntent(safeQuestion);
+      console.log("DEBUG: Intent detected:", detected);
+
+      if (detected === "greeting") {
+        try {
+          const greet = await aiService.chat({
+            systemPrompt: `You are a friendly assistant. The user has just greeted you. Provide a short greeting and 3 concise example questions the user can ask about their repository (one line each). Do NOT use markdown.`,
+            userPrompt: `Repository: ${repoName || "(none)"}\nUser: ${session.user?.login || "user"}`,
+            temperature: 0.2
+          });
+
+          return {
+            success: true,
+            response: (greet || "Hi 👋 I’m Samvaad. Ask me about your repository.")
+          };
+        } catch (e) {
+          return {
+            success: true,
+            response: "Hi 👋 I’m Samvaad. Ask me about your repository."
+          };
+        }
+      }
+
+      if (detected === "smalltalk") {
+        try {
+          const chit = await aiService.chat({
+            systemPrompt: `You are a friendly conversational assistant. The user said something casual. Reply briefly (1-2 sentences) and then offer 2 example repository-related questions the user can ask. Do NOT use markdown.`,
+            userPrompt: question || safeQuestion,
+            temperature: 0.4
+          });
+
+          return {
+            success: true,
+            response: (chit || "Nice to meet you! You can ask me about any repository you have access to.")
+          };
+        } catch (e) {
+          return {
+            success: true,
+            response: "Nice to meet you! You can ask me about any repository you have access to."
+          };
+        }
+      }
+
+      // Fallback: if detection failed, keep old lightweight greeting check
+      if (!detected && isGreeting(safeQuestion)) {
         return {
           success: true,
           response: "Hi 👋 I’m Samvaad. Ask me about your repository."
