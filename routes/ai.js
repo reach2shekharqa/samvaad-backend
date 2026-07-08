@@ -5,7 +5,7 @@ import aiService from "../agent/ai/AIService.js";
 
 const router = express.Router();
 
-const graph = buildSamvaadGraph();
+// const graph = buildSamvaadGraph();
 const inFlightRequests = new Map();
 
 /**
@@ -37,11 +37,20 @@ router.post("/chat", async (req, res) => {
   const { sessionId, repoName, question } = req.body;
   const safeQuestion = (question || "").trim().toLowerCase();
   const requestKey = `${sessionId}|${repoName}|${safeQuestion}`;
+  console.log("REQUEST KEY:", requestKey);
 
   if (inFlightRequests.has(requestKey)) {
+
     console.log("COALESCING duplicate request:", requestKey);
-    const cachedResponse = await inFlightRequests.get(requestKey);
-    return res.json(cachedResponse);
+
+    try {
+      const cachedResponse = await inFlightRequests.get(requestKey);
+      return res.json(cachedResponse);
+    } catch (e) {
+      // The previous request failed or got stuck.
+      // Remove it so the new request can start fresh.
+      inFlightRequests.delete(requestKey);
+    }
   }
 
   const responsePromise = (async () => {
@@ -232,7 +241,17 @@ router.post("/chat", async (req, res) => {
       // -----------------------------
       // RUN GRAPH
       // -----------------------------
-      const result = await graph.invoke(initialState);
+      const graph = buildSamvaadGraph();
+      console.log("Invoking graph...");
+      const result = await Promise.race([
+        graph.invoke(initialState),
+
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Graph timeout")), 60000)
+        )
+      ]);
+      console.log(result);
+      console.log("OUTPUT:\n", result.finalAnswer);
 
       // Save last interaction for session context to help follow-ups
       try {
@@ -268,7 +287,15 @@ router.post("/chat", async (req, res) => {
 
   try {
     const responsePayload = await responsePromise;
-    return res.json(responsePayload);
+
+    console.log("========== SENDING TO ANDROID ==========");
+    console.log(JSON.stringify(responsePayload, null, 2));
+
+    res.json(responsePayload);
+
+    console.log("========== SENT ==========");
+
+    return;
   } finally {
     inFlightRequests.delete(requestKey);
   }
