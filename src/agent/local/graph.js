@@ -22,7 +22,9 @@ export function buildLocalGraph() {
 
             evidence: "array",
 
-            finalResponse: "string"
+            finalResponse: "string",
+            
+            intent: "string",
 
         }
 

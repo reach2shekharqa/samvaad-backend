@@ -13,23 +13,34 @@ export async function localFinalNode(state) {
       );
 
 
+  console.log(
+    "DEBUG PLACES EVIDENCE:",
+    JSON.stringify(placesEvidence, null, 2)
+  );
+
+
   if (
     !response &&
-    placesEvidence?.data?.places
+    placesEvidence?.data?.data &&
+    Array.isArray(placesEvidence.data.data)
   ) {
 
-    const places =
-      placesEvidence.data.places;
+    const places = placesEvidence.data.data;
 
 
-    response =
-      "I found these places for you:\n\n" +
-      places
-        .map(
-          place =>
-            `${place.name} - ${place.rating}⭐ (${place.distance})`
-        )
-        .join("\n");
+    if (places.length > 0) {
+
+      response =
+        "I found these nearby places:\n\n" +
+        places
+          .slice(0, 5)
+          .map(
+            place =>
+              `📍 ${place.name || "Unnamed place"} (${place.type || "place"})\nLocation: ${place.lat}, ${place.lon}`
+          )
+          .join("\n\n");
+
+    }
 
   }
 
@@ -37,7 +48,7 @@ export async function localFinalNode(state) {
   if (!response) {
 
     response =
-      "I can help you with local places, restaurants, and nearby information.";
+      "I could not find any nearby places for this search. Please share your location so I can search more accurately.";
 
   }
 

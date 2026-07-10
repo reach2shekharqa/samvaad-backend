@@ -7,7 +7,16 @@ import dotenv from "dotenv";
 import aiRoutes from "./routes/ai.js";
 import sessionStore from "./store/SessionStore.js";
 
+import { registerTools } from "./src/agent/tools/registerTools.js";
+
+import toolManager from "./src/agent/tools/ToolManager.js";
+
 dotenv.config();
+registerTools();
+console.log(
+    "Registered tools:",
+    toolManager.getAll().map(t => t.name)
+);
 
 // Global error handlers to log unexpected crashes
 process.on("uncaughtException", (err) => {

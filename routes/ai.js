@@ -19,29 +19,25 @@ function isGreeting(text) {
   );
 }
 
-// function isRepoRelated(text) {
-//   const t = text.toLowerCase();
-
-//   return (
-//     t.includes("repo") ||
-//     t.includes("repository") ||
-//     t.includes("readme") ||
-//     t.includes("file") ||
-//     t.includes("code") ||
-//     t.includes("test") ||
-//     t.includes("function") ||
-//     t.includes("class") ||
-//     t.includes("project")
-//   );
-// }
 
 router.post("/chat", async (req, res) => {
   const {
     sessionId,
     repoName,
     question,
-    workspace
+    message,
+    workspace,
+    location,
+    context
   } = req.body;
+
+
+  const userQuestion = question || message || "";
+
+  const userLocation =
+    location ||
+    context?.location ||
+    null;
 
   console.log("WORKSPACE RECEIVED:", workspace);
   const validWorkspaces = [
@@ -55,7 +51,7 @@ router.post("/chat", async (req, res) => {
       response: "Invalid workspace"
     });
   }
-  const safeQuestion = (question || "").trim().toLowerCase();
+  const safeQuestion = (userQuestion).trim().toLowerCase();
   const requestKey = `${sessionId}|${repoName}|${safeQuestion}`;
   console.log("REQUEST KEY:", requestKey);
 
@@ -75,7 +71,7 @@ router.post("/chat", async (req, res) => {
 
   const responsePromise = (async () => {
     try {
-      const session = null;
+      let session = null;
 
       if (workspace === "devloper") {
 
@@ -97,7 +93,47 @@ router.post("/chat", async (req, res) => {
       async function detectIntent(text) {
         try {
           const result = await aiService.chat({
-            systemPrompt: `You are an intent classifier. Return ONLY valid JSON with the shape {"intent": "greeting" | "smalltalk" | "repo_question" | "other", "confidence": 0.0-1.0}. Do NOT include any other text.`,
+            systemPrompt: `
+You are an intent classifier.
+
+Return ONLY valid JSON.
+
+The JSON must have this exact shape:
+
+{
+  "intent": "greeting" | "smalltalk" | "repo_question" | "place_search" | "other",
+  "confidence": 0.0
+}
+
+Intent classification rules:
+
+- greeting:
+  User says hello, hi, hey, good morning, or similar greetings.
+
+- smalltalk:
+  Casual conversation that is not asking for information.
+
+- repo_question:
+  Questions about GitHub repositories, source code, files, bugs, architecture, or development.
+
+- place_search:
+  User wants local information or nearby places.
+  Examples:
+  "find parking near me"
+  "restaurants nearby"
+  "nearest hospital"
+  "find pharmacy"
+  "cafes around me"
+  "shops near my location"
+
+- other:
+  Anything that does not match the above categories.
+
+Rules:
+- Do not add markdown.
+- Do not add explanations.
+- Return only valid JSON.
+`,
             userPrompt: text,
             temperature: 0
           });
@@ -112,15 +148,21 @@ router.post("/chat", async (req, res) => {
       }
 
       // If LLM classifies the input as a greeting or smalltalk, produce a dynamic quick reply
-      const intentResult = await detectIntent(question || "");
-      const detected = intentResult.intent;
-      const detectedConfidence = intentResult.confidence;
+      const intentResult = await detectIntent(userQuestion);
+      let detected = intentResult.intent;
+      let detectedConfidence = intentResult.confidence;
       console.log("DEBUG: Intent detected:", detected, "confidence:", detectedConfidence);
 
       // If the user recently asked about the same repo in this session, treat ambiguous inputs as repo questions
       try {
-        const last = session.lastInteraction || {};
-        if ((detected === "other" || !detected) && last.lastIntent === "repo_question" && last.repoName === repoName) {
+        const last = session?.lastInteraction || {};
+
+        if (
+          workspace === "developer" &&
+          (detected === "other" || !detected) &&
+          last.lastIntent === "repo_question" &&
+          last.repoName === repoName
+        ) {
           console.log("DEBUG: Overriding ambiguous intent to repo_question based on session context");
           detected = "repo_question";
           detectedConfidence = 0.9;
@@ -142,21 +184,23 @@ router.post("/chat", async (req, res) => {
             ? `Repository: ${repoName || "(none)"}\nUser: ${session?.user?.login || "user"}`
             : `User: ${session?.user?.login || "user"}`;
 
+
           const greet = await aiService.chat({
             systemPrompt,
             userPrompt,
             temperature: 0.2
           });
 
+
           return {
             success: true,
-            response: (
+            response:
               greet ||
               (isDeveloper
                 ? "Hi 👋 I’m Samvaad. Ask me about your repository."
                 : "Hi 👋 I’m Samvaad. I can help you with local places and information.")
-            )
           };
+
 
         } catch (e) {
 
@@ -167,99 +211,223 @@ router.post("/chat", async (req, res) => {
                 ? "Hi 👋 I’m Samvaad. Ask me about your repository."
                 : "Hi 👋 I’m Samvaad. I can help you with local places and information."
           };
+
         }
       }
+
+
 
       if (detected === "smalltalk") {
+
         try {
+
+          const isDeveloper = workspace === "developer";
+
           const chit = await aiService.chat({
-            systemPrompt: `You are a friendly conversational assistant. The user said something casual. Reply briefly (1-2 sentences) and then offer 2 example repository-related questions the user can ask. Do NOT use markdown.`,
-            userPrompt: question || safeQuestion,
+
+            systemPrompt: isDeveloper
+              ? `You are a friendly conversational assistant. The user said something casual. Reply briefly (1-2 sentences) and then offer 2 example repository-related questions the user can ask. Do NOT use markdown.`
+              : `You are a friendly local assistant. The user said something casual. Reply briefly (1-2 sentences) and then offer 2 example questions about places, restaurants, nearby services, or local information. Do NOT use markdown.`,
+
+            userPrompt: userQuestion || safeQuestion,
+
             temperature: 0.4
+
           });
 
+
           return {
+
             success: true,
-            response: (chit || "Nice to meet you! You can ask me about any repository you have access to.")
+
+            response:
+              chit ||
+              (isDeveloper
+                ? "Nice to meet you! You can ask me about any repository you have access to."
+                : "Nice to meet you! You can ask me about places, restaurants, and local information.")
+
           };
+
+
         } catch (e) {
+
           return {
+
             success: true,
-            response: "Nice to meet you! You can ask me about any repository you have access to."
+
+            response:
+              workspace === "developer"
+                ? "Nice to meet you! You can ask me about any repository you have access to."
+                : "Nice to meet you! You can ask me about places, restaurants, and local information."
+
           };
+
         }
       }
 
-      // If intent is repo_question but confidence is low or the question is unclear, attempt paraphrase
-      if (detected === "repo_question") {
-        const rawQuestion = question || "";
 
-        // If confidence low or question is too short / looks like gibberish, ask LLM to paraphrase
-        const shouldParaphrase = detectedConfidence < 0.6 || rawQuestion.trim().length < 4 || /[^\w\s\?\.\!\-]/.test(rawQuestion);
+
+      // Developer only
+      if (
+        workspace === "developer" &&
+        detected === "repo_question"
+      ) {
+
+        const rawQuestion = userQuestion;
+
+
+        const shouldParaphrase =
+          detectedConfidence < 0.6 ||
+          rawQuestion.trim().length < 4 ||
+          /[^\w\s\?\.\!\-]/.test(rawQuestion);
+
+
 
         if (shouldParaphrase) {
+
           try {
+
             const paraphrase = await aiService.chat({
-              systemPrompt: `You are a paraphrasing assistant. Rephrase the user's input into a clear, concise repository-related question. If the input is gibberish or not a repository question, return an empty string. Return ONLY the paraphrased question or empty string, no explanation.`,
+
+              systemPrompt:
+                `You are a paraphrasing assistant. Rephrase the user's input into a clear, concise repository-related question. If the input is gibberish or not a repository question, return an empty string. Return ONLY the paraphrased question or empty string, no explanation.`,
+
               userPrompt: rawQuestion,
+
               temperature: 0.2
+
             });
 
-            const cleanedParaphrase = (paraphrase || "").replace(/```/g, "").trim();
+
+
+            const cleanedParaphrase =
+              (paraphrase || "")
+                .replace(/```/g, "")
+                .trim();
+
+
+
             if (!cleanedParaphrase || cleanedParaphrase.length < 3) {
-              // Ask for clarification instead of running planner/tools
+
+
               const clarify = await aiService.chat({
-                systemPrompt: `You are a helpful assistant. The user's question is unclear. Reply with a single short clarification request asking the user to rephrase or confirm they want a repository summary. Do NOT use markdown.`,
-                userPrompt: `User input: "${rawQuestion}"\nRepository: ${repoName || "(none)"}`,
+
+                systemPrompt:
+                  `You are a helpful assistant. The user's question is unclear. Reply with a single short clarification request asking the user to rephrase or confirm they want a repository summary. Do NOT use markdown.`,
+
+                userPrompt:
+                  `User input: "${rawQuestion}"\nRepository: ${repoName || "(none)"}`,
+
                 temperature: 0.2
+
               });
 
+
               return {
+
                 success: true,
-                response: (clarify || "I didn't understand that. Could you rephrase your question or ask me to summarize the repository?")
+
+                response:
+                  clarify ||
+                  "I didn't understand that. Could you rephrase your repository question?"
+
               };
+
             }
 
-            // Replace safeQuestion with paraphrased clearer question for planner
-            console.log("DEBUG: Paraphrased question:", cleanedParaphrase);
-            // use cleanedParaphrase (keep original casing)
-            // update safeQuestion variable used by graph
-            // Note: state.input expects lowercased earlier, but planner can handle original casing; keep as-is
-            // We'll set a new variable for planner input later
+
+            console.log(
+              "DEBUG: Paraphrased question:",
+              cleanedParaphrase
+            );
+
+
             var plannerInput = cleanedParaphrase;
+
+
           } catch (e) {
-            console.warn("Paraphrase failed, proceeding with original question:", e && e.message ? e.message : e);
+
+            console.warn(
+              "Paraphrase failed:",
+              e.message
+            );
+
           }
+
         }
+
       }
 
-      // If intent is explicitly 'other' (unclear / gibberish), ask for clarification instead
+
+
+      // Generic unclear handling
       if (detected === "other") {
+
         try {
+
           const clarify = await aiService.chat({
-            systemPrompt: `You are a helpful assistant. The user input may be unclear. Return a single short clarification question asking the user to rephrase or confirm they want a repository summary. Do NOT include markdown or extra explanation.`,
-            userPrompt: `User input: "${question || ""}"\nRepository: ${repoName || "(none)"}`,
+
+            systemPrompt:
+              workspace === "developer"
+
+                ? `You are a helpful assistant. The user input may be unclear. Ask a short clarification about the repository question. Do NOT include markdown.`
+
+                : `You are a helpful assistant. The user input may be unclear. Ask a short clarification about the place or local information they need. Do NOT include markdown.`,
+
+            userPrompt:
+              `User input: "${userQuestion}"`,
+
             temperature: 0.2
+
           });
 
+
           return {
+
             success: true,
-            response: (clarify || "I didn't understand that. Could you rephrase your question or ask me to summarize the repository?")
+
+            response:
+              clarify ||
+              (workspace === "developer"
+                ? "Could you rephrase your repository question?"
+                : "Could you tell me what place or local information you need?")
+
           };
+
+
         } catch (e) {
+
           return {
+
             success: true,
-            response: "I didn't understand that. Could you rephrase your question or ask me to summarize the repository?"
+
+            response:
+              workspace === "developer"
+                ? "Could you rephrase your repository question?"
+                : "Could you tell me what place or local information you need?"
+
           };
+
         }
+
       }
 
-      // Fallback: if detection failed, keep old lightweight greeting check
+
+
+      // Final fallback greeting
       if (!detected && isGreeting(safeQuestion)) {
+
         return {
+
           success: true,
-          response: "Hi 👋 I’m Samvaad. Ask me about your repository."
+
+          response:
+            workspace === "developer"
+              ? "Hi 👋 I’m Samvaad. Ask me about your repository."
+              : "Hi 👋 I’m Samvaad. I can help you with local places and information."
+
         };
+
       }
 
       let workspaceContext = {};
@@ -281,10 +449,12 @@ router.post("/chat", async (req, res) => {
         input: typeof plannerInput === 'string' && plannerInput.length > 0
           ? plannerInput
           : safeQuestion,
+        intent: detected,
 
         context: {
           sessionId,
           repoName,
+          location: userLocation,
           ...workspaceContext
         },
 
@@ -298,7 +468,8 @@ router.post("/chat", async (req, res) => {
         iteration: 0,
         maxIterations: 5,
         finalResponse: "",
-        executedTools: []
+        executedTools: [],
+
       };
 
       // -----------------------------
@@ -306,6 +477,10 @@ router.post("/chat", async (req, res) => {
       // -----------------------------
 
       const graph = getWorkspaceGraph(workspace);
+      console.log(
+        "DEBUG INITIAL LOCATION:",
+        JSON.stringify(initialState.context.location, null, 2)
+      );
       const result = await graph.invoke(initialState);
 
       // Save last interaction for session context to help follow-ups
@@ -313,7 +488,7 @@ router.post("/chat", async (req, res) => {
         const updatedSession = {
           ...session,
           lastInteraction: {
-            lastIntent: "repo_question",
+            lastIntent: detected,
             repoName,
             question: question || safeQuestion,
             timestamp: Date.now()

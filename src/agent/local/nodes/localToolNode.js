@@ -26,10 +26,43 @@ export async function localToolNode(state) {
 
   try {
 
+    const userLocation =
+      toolRequest.location ||
+      state.context?.location ||
+      state.location;
+
+
+    const lat =
+      userLocation?.lat ??
+      userLocation?.latitude;
+
+
+    const lon =
+      userLocation?.lon ??
+      userLocation?.longitude;
+
+
+
+    console.log(
+      "📍 Tool location:",
+      lat,
+      lon
+    );
+
+console.log(
+  "DEBUG TOOL REQUEST RECEIVED:",
+  JSON.stringify(toolRequest, null, 2)
+);
     result = await searchPlaces({
+
       query: toolRequest.query,
-      location: toolRequest.location
+
+      lat,
+
+      lon
+
     });
+
 
 
     console.log(

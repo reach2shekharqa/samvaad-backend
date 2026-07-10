@@ -8,6 +8,10 @@ export async function localPlannerNode(state) {
   const input = state.input || "";
 
   console.log("User input:", input);
+  console.log(
+  "DEBUG LOCAL CONTEXT:",
+  JSON.stringify(state.context, null, 2)
+);
 
 
   let action = "finish";
@@ -29,17 +33,30 @@ export async function localPlannerNode(state) {
     question.includes("restaurant") ||
     question.includes("food") ||
     question.includes("eat") ||
-    question.includes("place")
+    question.includes("place") ||
+    question.includes("parking") ||
+    question.includes("hospital") ||
+    question.includes("pharmacy") ||
+    question.includes("shop") ||
+    question.includes("hotel") ||
+    state.intent === "place_search"
   ) {
 
     console.log("📍 Local planner selected places tool");
 
 
     const toolRequest = {
-      query: input,
-      location: state.context?.location || "current location"
-    };
 
+      query: input,
+
+      location:
+        state.context?.location || null
+
+    };
+console.log(
+  "DEBUG TOOL REQUEST:",
+  JSON.stringify(toolRequest, null, 2)
+);
 
     return {
 
