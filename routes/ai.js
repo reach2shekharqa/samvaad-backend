@@ -17,24 +17,42 @@ function isGreeting(text) {
   );
 }
 
-function isRepoRelated(text) {
-  const t = text.toLowerCase();
+// function isRepoRelated(text) {
+//   const t = text.toLowerCase();
 
-  return (
-    t.includes("repo") ||
-    t.includes("repository") ||
-    t.includes("readme") ||
-    t.includes("file") ||
-    t.includes("code") ||
-    t.includes("test") ||
-    t.includes("function") ||
-    t.includes("class") ||
-    t.includes("project")
-  );
-}
+//   return (
+//     t.includes("repo") ||
+//     t.includes("repository") ||
+//     t.includes("readme") ||
+//     t.includes("file") ||
+//     t.includes("code") ||
+//     t.includes("test") ||
+//     t.includes("function") ||
+//     t.includes("class") ||
+//     t.includes("project")
+//   );
+// }
 
 router.post("/chat", async (req, res) => {
-  const { sessionId, repoName, question } = req.body;
+  const {
+    sessionId,
+    repoName,
+    question,
+    workspace
+  } = req.body;
+
+  console.log("WORKSPACE RECEIVED:", workspace);
+  const validWorkspaces = [
+    "developer",
+    "local"
+  ];
+
+  if (!validWorkspaces.includes(workspace)) {
+    return res.status(400).json({
+      success: false,
+      response: "Invalid workspace"
+    });
+  }
   const safeQuestion = (question || "").trim().toLowerCase();
   const requestKey = `${sessionId}|${repoName}|${safeQuestion}`;
   console.log("REQUEST KEY:", requestKey);
@@ -55,14 +73,21 @@ router.post("/chat", async (req, res) => {
 
   const responsePromise = (async () => {
     try {
-      const session = await sessionStore.get(sessionId);
+      const session = null;
 
-      if (!session) {
-        return {
-          success: false,
-          response: "Session expired. Please login again."
-        };
+      if (workspace === "devloper") {
+
+        session = await sessionStore.get(sessionId);
+
+        if (!session) {
+          return {
+            success: false,
+            response: "Session expired. Please login again."
+          };
+        }
       }
+
+
 
       // -----------------------------
       // DYNAMIC INTENT DETECTION (LLM)
@@ -104,20 +129,41 @@ router.post("/chat", async (req, res) => {
 
       if (detected === "greeting") {
         try {
+
+          const isDeveloper = workspace === "developer";
+
+          const systemPrompt = isDeveloper
+            ? `You are a friendly assistant. The user has just greeted you. Provide a short greeting and 3 concise example questions the user can ask about their repository (one line each). Do NOT use markdown.`
+            : `You are a friendly local assistant. The user has just greeted you. Provide a short greeting and 3 concise example questions about places, restaurants, nearby services, or local information (one line each). Do NOT use markdown.`;
+
+          const userPrompt = isDeveloper
+            ? `Repository: ${repoName || "(none)"}\nUser: ${session?.user?.login || "user"}`
+            : `User: ${session?.user?.login || "user"}`;
+
           const greet = await aiService.chat({
-            systemPrompt: `You are a friendly assistant. The user has just greeted you. Provide a short greeting and 3 concise example questions the user can ask about their repository (one line each). Do NOT use markdown.`,
-            userPrompt: `Repository: ${repoName || "(none)"}\nUser: ${session.user?.login || "user"}`,
+            systemPrompt,
+            userPrompt,
             temperature: 0.2
           });
 
           return {
             success: true,
-            response: (greet || "Hi 👋 I’m Samvaad. Ask me about your repository.")
+            response: (
+              greet ||
+              (isDeveloper
+                ? "Hi 👋 I’m Samvaad. Ask me about your repository."
+                : "Hi 👋 I’m Samvaad. I can help you with local places and information.")
+            )
           };
+
         } catch (e) {
+
           return {
             success: true,
-            response: "Hi 👋 I’m Samvaad. Ask me about your repository."
+            response:
+              workspace === "developer"
+                ? "Hi 👋 I’m Samvaad. Ask me about your repository."
+                : "Hi 👋 I’m Samvaad. I can help you with local places and information."
           };
         }
       }
@@ -214,11 +260,17 @@ router.post("/chat", async (req, res) => {
         };
       }
 
-      const github = {
-        owner: session.user.login,
-        repo: repoName,
-        token: session.token
-      };
+      let workspaceContext = {};
+
+      if (workspace === "developer") {
+
+        workspaceContext.github = {
+          owner: session.user.login,
+          repo: repoName,
+          token: session.token
+        };
+
+      }
 
       // -----------------------------
       // GRAPH INPUT STATE
@@ -241,17 +293,23 @@ router.post("/chat", async (req, res) => {
       // -----------------------------
       // RUN GRAPH
       // -----------------------------
-      const graph = buildSamvaadGraph();
-      console.log("Invoking graph...");
-      const result = await Promise.race([
-        graph.invoke(initialState),
+      let graph;
 
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Graph timeout")), 60000)
-        )
-      ]);
-      console.log(result);
-      console.log("OUTPUT:\n", result.finalAnswer);
+      switch (workspace) {
+
+        case "developer":
+          graph = buildDeveloperGraph();
+          break;
+
+        case "local":
+          graph = buildLocalGraph();
+          break;
+
+        default:
+          throw new Error("Unknown workspace");
+      }
+
+      const result = await graph.invoke(initialState);
 
       // Save last interaction for session context to help follow-ups
       try {

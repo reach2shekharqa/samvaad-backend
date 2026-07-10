@@ -49,9 +49,9 @@ export function buildSamvaadGraph() {
 });
 
   // ---------------- EDGES ----------------
-  graph.addEdge("planner", "router");
-  graph.addEdge("tool", "router");
-  graph.addEdge("final", "__end__");
+  // graph.addEdge("planner", "router");
+  // graph.addEdge("tool", "router");
+  // graph.addEdge("final", "__end__");
 
   return graph.compile();
 }
