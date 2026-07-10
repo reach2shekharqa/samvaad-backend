@@ -1,11 +1,13 @@
 import express from "express";
-import { buildSamvaadGraph } from "../src/agent/graph.js";
+
 import sessionStore from "../store/SessionStore.js";
 import aiService from "../src/agent/ai/AIService.js";
 
+import { getWorkspaceGraph } from "../src/agent/workspaceRouter.js";
+
 const router = express.Router();
 
-// const graph = buildSamvaadGraph();
+
 const inFlightRequests = new Map();
 
 /**
@@ -276,12 +278,21 @@ router.post("/chat", async (req, res) => {
       // GRAPH INPUT STATE
       // -----------------------------
       const initialState = {
-        input: typeof plannerInput === 'string' && plannerInput.length > 0 ? plannerInput : safeQuestion,
-        context: { sessionId, repoName, github },
-        github,
+        input: typeof plannerInput === 'string' && plannerInput.length > 0
+          ? plannerInput
+          : safeQuestion,
+
+        context: {
+          sessionId,
+          repoName,
+          ...workspaceContext
+        },
+
+        ...workspaceContext,
+
         plan: {},
         toolResults: {},
-        evidence: {},
+        evidence: [],
         memory: {},
         action: "",
         iteration: 0,
@@ -293,22 +304,8 @@ router.post("/chat", async (req, res) => {
       // -----------------------------
       // RUN GRAPH
       // -----------------------------
-      let graph;
 
-      switch (workspace) {
-
-        case "developer":
-          graph = buildDeveloperGraph();
-          break;
-
-        case "local":
-          graph = buildLocalGraph();
-          break;
-
-        default:
-          throw new Error("Unknown workspace");
-      }
-
+      const graph = getWorkspaceGraph(workspace);
       const result = await graph.invoke(initialState);
 
       // Save last interaction for session context to help follow-ups
