@@ -1,11 +1,11 @@
-import toolManager from "./tools/ToolManager.js";
-import readReadmeTool from "./tools/readReadmeTool.js";
+import toolManager from "./src/agent/tools/ToolManager.js";
+import { readFileTool } from "./src/agent/tools/readFileTool.js";
 
-import { plannerNode } from "./agent/nodes/plannerNode.js";
-import { ToolNode } from "./agent/nodes/ToolNode.js";
-import responseAgent from "./agent/agents/ResponseAgent.js";
+import { plannerNode } from "./src/agent/nodes/plannerNode.js";
+import { ToolNode } from "./src/agent/nodes/ToolNode.js";
+import responseAgent from "./src/agent/agents/ResponseAgent.js";
 
-toolManager.register(readReadmeTool);
+toolManager.register(readFileTool);
 
 const toolNode = new ToolNode(toolManager);
 

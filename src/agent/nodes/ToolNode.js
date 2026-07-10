@@ -1,5 +1,5 @@
-import { discoverRepositoryTool } from "../../tools/discoverRepositoryTool.js";
-import { readFileTool } from "../../tools/readFileTool.js";
+import { discoverRepositoryTool } from "../tools/discoverRepositoryTool.js";
+import { readFileTool } from "../tools/readFileTool.js";
 
 export async function toolNode(state) {
 

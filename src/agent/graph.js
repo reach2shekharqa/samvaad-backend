@@ -1,7 +1,7 @@
 import { StateGraph } from "@langchain/langgraph";
 
 import { plannerNode } from "./nodes/plannerNode.js";
-import { toolNode } from "./nodes/toolNode.js";
+import { toolNode } from "./nodes/ToolNode.js";
 import { routerNode } from "./nodes/routerNode.js";
 import { finalNode } from "./nodes/finalNode.js";
 

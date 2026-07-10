@@ -1,7 +1,7 @@
 import express from "express";
-import { buildSamvaadGraph } from "../agent/graph.js";
+import { buildSamvaadGraph } from "../src/agent/graph.js";
 import sessionStore from "../store/SessionStore.js";
-import aiService from "../agent/ai/AIService.js";
+import aiService from "../src/agent/ai/AIService.js";
 
 const router = express.Router();
 

@@ -1,5 +1,3 @@
-import "./bootstrap.js"; // ✅ MUST BE FIRST LINE
-
 import { buildSamvaadGraph } from "./graph.js";
 import { createInitialState } from "./state.js";
 
