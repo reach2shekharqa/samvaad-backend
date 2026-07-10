@@ -73,7 +73,7 @@ router.post("/chat", async (req, res) => {
     try {
       let session = null;
 
-      if (workspace === "devloper") {
+      if (workspace === "developer") {
 
         session = await sessionStore.get(sessionId);
 

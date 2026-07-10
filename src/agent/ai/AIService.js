@@ -74,6 +74,109 @@ class AIService {
       }
     }
   }
+
+  async normalizePlaceQuery(query) {
+
+    const response = await this.chat({
+
+      systemPrompt: `
+You normalize local search queries.
+
+Return ONLY valid JSON.
+
+{
+  "category": "",
+  "keywords": ""
+}
+
+Rules:
+
+- Fix spelling mistakes.
+- Convert synonyms to a standard category.
+- Never explain.
+- Never use markdown.
+
+Examples:
+
+restaurant
+restaurants
+resturant
+restuarant
+food
+eat
+dinner
+lunch
+
+→
+
+{
+ "category":"restaurant",
+ "keywords":"restaurant"
+}
+
+parking
+car parking
+park my car
+
+→
+
+{
+ "category":"parking",
+ "keywords":"parking"
+}
+
+hospital
+clinic
+
+→
+
+{
+ "category":"hospital",
+ "keywords":"hospital"
+}
+
+pharmacy
+chemist
+medicine shop
+
+→
+
+{
+ "category":"pharmacy",
+ "keywords":"pharmacy"
+}
+
+coffee
+coffee shop
+cafe
+
+→
+
+{
+ "category":"cafe",
+ "keywords":"cafe"
+}
+
+hotel
+stay
+
+→
+
+{
+ "category":"hotel",
+ "keywords":"hotel"
+}
+`,
+
+      userPrompt: query,
+
+      temperature: 0
+
+    });
+
+    return JSON.parse(response);
+
+  }
 }
 
 export default new AIService();

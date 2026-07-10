@@ -1,5 +1,3 @@
-import { searchPlaces } from "../tools/placesTool.js";
-
 
 export async function localPlannerNode(state) {
 
@@ -9,9 +7,9 @@ export async function localPlannerNode(state) {
 
   console.log("User input:", input);
   console.log(
-  "DEBUG LOCAL CONTEXT:",
-  JSON.stringify(state.context, null, 2)
-);
+    "DEBUG LOCAL CONTEXT:",
+    JSON.stringify(state.context, null, 2)
+  );
 
 
   let action = "finish";
@@ -53,10 +51,10 @@ export async function localPlannerNode(state) {
         state.context?.location || null
 
     };
-console.log(
-  "DEBUG TOOL REQUEST:",
-  JSON.stringify(toolRequest, null, 2)
-);
+    console.log(
+      "DEBUG TOOL REQUEST:",
+      JSON.stringify(toolRequest, null, 2)
+    );
 
     return {
 

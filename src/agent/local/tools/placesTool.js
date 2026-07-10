@@ -1,64 +1,33 @@
 import axios from "axios";
+import aiService from "./../../ai/AIService.js";
 
 
-function resolveCategory(query) {
+function resolveCategory(category) {
 
-    const q = (query || "").toLowerCase();
+    switch ((category || "").toLowerCase()) {
 
+        case "restaurant":
+            return "catering.restaurant";
 
-    if (
-        q.includes("parking") ||
-        q.includes("park car") ||
-        q.includes("car park")
-    ) {
-        return "parking";
+        case "parking":
+            return "parking";
+
+        case "hospital":
+            return "healthcare.hospital";
+
+        case "pharmacy":
+            return "healthcare.pharmacy";
+
+        case "cafe":
+            return "catering.cafe";
+
+        case "hotel":
+            return "accommodation.hotel";
+
+        default:
+            return null;
     }
 
-
-    if (
-        q.includes("restaurant") ||
-        q.includes("food") ||
-        q.includes("eat") ||
-        q.includes("dinner") ||
-        q.includes("lunch")
-    ) {
-        return "catering.restaurant";
-    }
-
-
-    if (
-        q.includes("hospital") ||
-        q.includes("clinic")
-    ) {
-        return "healthcare.hospital";
-    }
-
-
-    if (
-        q.includes("pharmacy") ||
-        q.includes("medicine") ||
-        q.includes("medical")
-    ) {
-        return "healthcare.pharmacy";
-    }
-
-
-    if (
-        q.includes("cafe") ||
-        q.includes("coffee")
-    ) {
-        return "catering.cafe";
-    }
-
-
-    if (
-        q.includes("hotel")
-    ) {
-        return "accommodation.hotel";
-    }
-
-
-    return "commercial";
 }
 
 
@@ -93,13 +62,35 @@ export async function searchPlaces({
 
     try {
 
-        const category = resolveCategory(query);
+        let category = resolveCategory(query);
 
+if (!category) {
 
-        console.log(
-            "Geoapify category:",
-            category
-        );
+    try {
+
+        const normalized =
+            await aiService.normalizePlaceQuery(query);
+
+        console.log("Normalized:", normalized);
+
+        category = resolveCategory(normalized.category);
+
+    } catch (e) {
+
+        console.log("Normalization failed:", e.message);
+
+    }
+
+}
+
+if (!category) {
+    category = "commercial";
+}
+
+console.log(
+    "Geoapify category:",
+    category
+);
 
 
         const radius = 5000;
