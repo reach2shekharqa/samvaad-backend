@@ -11,6 +11,8 @@ import { registerTools } from "./src/agent/tools/registerTools.js";
 
 import toolManager from "./src/agent/tools/ToolManager.js";
 
+import dayRoutes from "./routes/day.js";
+
 dotenv.config();
 registerTools();
 console.log(
@@ -33,6 +35,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+
+
 // optional request logging (disabled by default)
 app.use((req, res, next) => {
     if (process.env.LOG_REQUESTS === "true" && req.url.startsWith("/ai")) {
@@ -52,6 +56,7 @@ app.use((req, res, next) => {
 // AI Routes
 // ----------------------
 app.use("/ai", aiRoutes);
+app.use("/day", dayRoutes);
 
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;

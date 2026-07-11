@@ -42,7 +42,8 @@ router.post("/chat", async (req, res) => {
   console.log("WORKSPACE RECEIVED:", workspace);
   const validWorkspaces = [
     "developer",
-    "local"
+    "local",
+    "day"
   ];
 
   if (!validWorkspaces.includes(workspace)) {
@@ -101,7 +102,7 @@ Return ONLY valid JSON.
 The JSON must have this exact shape:
 
 {
-  "intent": "greeting" | "smalltalk" | "repo_question" | "place_search" | "other",
+  "intent": "greeting" | "smalltalk" | "repo_question" | "place_search" | "day_query"| "other",
   "confidence": 0.0
 }
 
@@ -115,6 +116,17 @@ Intent classification rules:
 
 - repo_question:
   Questions about GitHub repositories, source code, files, bugs, architecture, or development.
+
+-day_query:
+Questions related to:
+- hora
+- astrology
+- panchang
+- muhurat
+- horoscope
+- today's prediction
+- today's planetary hour
+- auspicious time
 
 - place_search:
   User wants local information or nearby places.
@@ -155,20 +167,38 @@ Rules:
 
       // If the user recently asked about the same repo in this session, treat ambiguous inputs as repo questions
       try {
-        const last = session?.lastInteraction || {};
+
+        const last =
+          session?.lastInteraction || {};
+
 
         if (
           workspace === "developer" &&
-          (detected === "other" || !detected) &&
-          last.lastIntent === "repo_question" &&
-          last.repoName === repoName
+          repoName &&
+          (detected === "other" || !detected)
         ) {
-          console.log("DEBUG: Overriding ambiguous intent to repo_question based on session context");
-          detected = "repo_question";
-          detectedConfidence = 0.9;
+
+          console.log(
+            "DEBUG: Developer workspace forcing repo_question"
+          );
+
+
+          detected =
+            "repo_question";
+
+
+          detectedConfidence =
+            0.9;
+
         }
+
       } catch (e) {
-        // ignore
+
+        console.warn(
+          "Intent override failed:",
+          e.message
+        );
+
       }
 
       if (detected === "greeting") {
@@ -361,7 +391,7 @@ Rules:
 
 
       // Generic unclear handling
-      if (detected === "other") {
+      if (workspace !== "day" && detected === "other") {
 
         try {
 
@@ -446,29 +476,46 @@ Rules:
       // GRAPH INPUT STATE
       // -----------------------------
       const initialState = {
-        input: typeof plannerInput === 'string' && plannerInput.length > 0
-          ? plannerInput
-          : safeQuestion,
+
+        input:
+          typeof plannerInput === "string" && plannerInput.length > 0
+            ? plannerInput
+            : safeQuestion,
+
         intent: detected,
 
         context: {
+
           sessionId,
+
           repoName,
-          location: userLocation,
-          ...workspaceContext
+
+          ...workspaceContext,
+
+          // Always use the latest detected location
+          location: userLocation
+
         },
 
         ...workspaceContext,
 
         plan: {},
+
         toolResults: {},
+
         evidence: [],
+
         memory: {},
+
         action: "",
+
         iteration: 0,
+
         maxIterations: 5,
+
         finalResponse: "",
-        executedTools: [],
+
+        executedTools: []
 
       };
 

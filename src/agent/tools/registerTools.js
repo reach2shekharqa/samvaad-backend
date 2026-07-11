@@ -1,20 +1,37 @@
-import toolManager from "./ToolManager.js";
+import readFileTool from "./developer/readFileTool.js";
+import discoverRepositoryTool from "./developer/discoverRepositoryTool.js";
 
-import {readFileTool} from "./readFileTool.js";
+import placesSearchTool from "./local/placesSearchTool.js";
+import  placesTool  from "./local/placesTool.js";
 
-import { discoverRepositoryTool } from "./discoverRepositoryTool.js";
-
-import { localTools } from "../local/tools/index.js";
+import horaTool from "./day/horaTool.js";
 
 
 export function registerTools() {
 
-    toolManager.register(readFileTool);
+    console.log("🔧 Registering tools...");
 
-    toolManager.register(discoverRepositoryTool);
 
-    for (const tool of localTools) {
-        toolManager.register(tool);
-    }
+    const tools = [
 
+        readFileTool,
+
+        discoverRepositoryTool,
+
+        placesSearchTool,
+
+        placesTool,
+
+        horaTool
+
+    ];
+
+
+    console.log(
+        "Registered tools:",
+        tools.map(t => t.name)
+    );
+
+
+    return tools;
 }

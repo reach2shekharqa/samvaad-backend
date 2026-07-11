@@ -1,92 +1,365 @@
 import aiService from "../ai/AIService.js";
 
+
 export async function plannerNode(state) {
 
-  const result = await aiService.chat({
-    systemPrompt: `
-You are a planning agent.
 
-You decide whether to use tools or answer directly.
+    const evidence =
+        state.evidence || [];
 
-Available tools:
 
-1. readFileTool
-- Use for reading files from a GitHub repository.
 
-2. discoverRepositoryTool
-- Use for discovering repository structure and files.
+    const hasDiscovery =
+        evidence.some(
+            e =>
+                e.tool === "discoverRepositoryTool" &&
+                e.result?.success
+        );
 
-3. placesSearchTool
-- Use for local place searches.
-- Examples:
-  - restaurants near a location
-  - parking
-  - hospitals
-  - shops
-  - nearby services
+
+
+    if ((state.iteration || 0) >= 5) {
+
+
+        console.log(
+            "🧠 Planner Action: final (max iterations)"
+        );
+
+
+        return {
+
+            ...state,
+
+            action: "final",
+
+            tools: []
+
+        };
+
+    }
+
+
+
+
+    // -----------------------------
+    // STEP 1
+    // Discover repository
+    // -----------------------------
+
+
+    if (!hasDiscovery) {
+
+
+        console.log(
+            "🧠 Planner -> discoverRepositoryTool"
+        );
+
+
+        return {
+
+            ...state,
+
+            action: "tool",
+
+
+            tools: [
+
+                {
+
+                    name:
+                        "discoverRepositoryTool",
+
+                    input: {}
+
+                }
+
+            ]
+
+        };
+
+    }
+
+
+
+
+
+    const discovery =
+        evidence.find(
+            e =>
+                e.tool === "discoverRepositoryTool"
+        )?.result?.data;
+
+
+
+
+    // -----------------------------
+    // Already read files
+    // -----------------------------
+
+
+    const readFiles =
+        (state.evidence?.items || [])
+            .filter(
+                e =>
+                    e.type === "file" &&
+                    e.success
+            )
+            .map(
+                e =>
+                    e.filePath
+            )
+            .filter(Boolean);
+
+
+
+
+
+
+    // -----------------------------
+    // STEP 2
+    // Recommended files first
+    // -----------------------------
+
+
+    const recommendedFiles =
+        discovery?.recommendedFiles || [];
+
+
+
+    let nextFile =
+        recommendedFiles.find(
+            file =>
+                !readFiles.includes(file)
+        );
+
+
+
+
+    // -----------------------------
+    // STEP 3
+    // Fallback root files
+    // -----------------------------
+
+
+    if (!nextFile) {
+
+
+        const rootFiles =
+            discovery?.rootFiles || [];
+
+
+
+        const preferredRootFiles = [
+
+            "Dockerfile",
+            "docker-compose.yml",
+            "Makefile",
+            "settings.gradle",
+            "build.gradle",
+            "build.gradle.kts",
+            "pom.xml",
+            "package.json",
+            "requirements.txt",
+            "pyproject.toml",
+            "go.mod",
+            "Cargo.toml"
+
+        ];
+
+
+
+        nextFile =
+            preferredRootFiles.find(
+
+                file =>
+                    rootFiles.includes(file) &&
+                    !readFiles.includes(file)
+
+            );
+
+    }
+
+
+
+
+
+    if (nextFile) {
+
+
+        console.log(
+            "🧠 Planner -> readFileTool:",
+            nextFile
+        );
+
+
+
+        return {
+
+
+            ...state,
+
+
+            action: "tool",
+
+
+            tools: [
+
+                {
+
+                    name: "readFileTool",
+
+                    input: {
+
+                        filePath: nextFile
+
+                    }
+
+                }
+
+            ]
+
+        };
+
+    }
+
+
+
+
+
+    // -----------------------------
+    // STEP 4
+    // LLM fallback
+    // -----------------------------
+
+
+    const result =
+        await aiService.chat({
+
+
+            systemPrompt: `
+
+You are Samvaad Planner.
+
+Repository files are collected.
+
+Choose ONE file that will help understand repository architecture.
 
 Rules:
-- If external data is required, return action="tool".
-- If enough information is already available, return action="final".
 
-Return ONLY valid JSON. No markdown. No explanation.
+- Select only from provided files.
+- Prefer source entry points or configuration files.
+- If nothing useful exists return final.
 
-Format:
+Return ONLY JSON:
+
 {
-  "action": "tool" | "final",
-  "tools": [
-    {
-      "name": "toolName",
-      "input": {}
+ "action":"tool",
+ "tools":[
+   {
+    "name":"readFileTool",
+    "input":{
+      "filePath":"..."
     }
-  ]
+   }
+ ]
 }
+
+or
+
+{
+ "action":"final"
+}
+
 `,
-    userPrompt: state.input || ""
-  });
 
-  let parsed;
 
-  try {
-    // 🔥 CLEAN RAW OUTPUT FIRST
-    const cleaned = result
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+            userPrompt: JSON.stringify({
 
-    parsed = JSON.parse(cleaned);
+                question: state.input,
 
-  } catch (e) {
-    console.log("❌ Planner JSON parse failed:", result);
+                evidence: {
 
-    parsed = {
-      action: "tool",
-      tools: []
+                    items:
+                        state.evidence?.items || []
+
+                }
+
+            })
+
+        });
+
+
+
+
+
+    let parsed;
+
+
+    try {
+
+
+        parsed =
+            JSON.parse(
+
+                result
+                    .replace(/```json/g, "")
+                    .replace(/```/g, "")
+                    .trim()
+
+            );
+
+
+    } catch {
+
+
+        parsed = {
+
+            action: "final"
+
+        };
+
+    }
+
+
+
+
+    let action =
+        (parsed.action || "final")
+            .toLowerCase();
+
+
+
+
+    if (!["tool", "final"].includes(action)) {
+
+        action = "final";
+
+    }
+
+
+
+
+
+    console.log(
+        `🧠 Planner Action: ${action}`
+    );
+
+
+
+    return {
+
+
+        ...state,
+
+
+        action,
+
+
+        tools:
+            parsed.tools || []
+
+
     };
-  }
 
-  // Normalize action names: accept "finish" from older prompts and map to "final"
-  let action = (parsed.action || "tool").toString().toLowerCase();
-  if (action === "finish") action = "final";
-  if (action !== "tool" && action !== "final") action = "tool";
 
-  // If tools were requested but we already have evidence collected, prefer final to avoid redundant tool runs
-  const hasEvidenceArray = Array.isArray(state.evidence) && state.evidence.length > 0;
-  const hasEvidenceItems = state.evidence && Array.isArray(state.evidence.items) && state.evidence.items.length > 0;
-  
-  // If no evidence collected yet, retry tools
-  // If we have evidence, go to final
-  if (!hasEvidenceArray && !hasEvidenceItems && action === "tool") {
-    action = "tool"; // retry tools
-  } else if ((hasEvidenceArray || hasEvidenceItems) && action === "tool") {
-    action = "final"; // we have data, go final
-  }
-
-  console.log("STAGE: Planner [action: " + action + "]");
-
-  return {
-    ...state,
-    action,
-    tools: parsed.tools || []
-  };
 }

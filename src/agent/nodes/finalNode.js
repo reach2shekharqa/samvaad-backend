@@ -1,66 +1,246 @@
 import aiService from "../ai/AIService.js";
 
+
 export async function finalNode(state) {
 
-  // Check if tool discovered an error (repo not found, access denied, etc.)
-  const evidence = Array.isArray(state.evidence) ? state.evidence[0] : {};
-  
-  if (evidence.error) {
-    console.log("STAGE: Final [Repository Error]");
-    const errorMsg = `⚠️ **Repository Not Found or Inaccessible**\n\nRepository: ${evidence.error.owner}/${evidence.error.repo}\nReason: ${evidence.error.message}\n\n${evidence.error.suggestion || "Please verify the repository name and ensure it's public."}`;
-    console.log("OUTPUT:\n", errorMsg);
-    
-    return {
-      ...state,
-      finalResponse: errorMsg,
-      action: "end"
-    };
-  }
 
-  // Check if evidence was collected successfully
-  const hasEvidence = (evidence && evidence.metadata) || (evidence && evidence.relevantFiles && Object.keys(evidence.relevantFiles).length > 0);
+    const evidence =
+        state.evidence || [];
 
-  if (!hasEvidence) {
-    console.log("STAGE: Final [No Evidence - Unable to Respond]");
-    return {
-      ...state,
-      finalResponse: "I was unable to retrieve information about the repository. The repository name or access may be incorrect. Please verify the repository name and try again.",
-      action: "end"
-    };
-  }
 
-  // Log which files were used
-  const filesUsed = evidence.relevantFiles ? Object.keys(evidence.relevantFiles) : [];
-  console.log("📄 Files used for final answer:", filesUsed.length > 0 ? filesUsed.join(", ") : "directory structure only");
 
-  const result = await aiService.chat({
-    systemPrompt: `
-You are a repository analyst. Answer the user's question about the repository using ONLY the provided evidence.
+    if (evidence.length === 0) {
 
-Be direct, specific, and detailed. Use the evidence to support your answer.
-    `,
-    userPrompt: `
+
+        return {
+
+
+            ...state,
+
+
+            finalResponse:
+                "I couldn't collect enough information to answer your question."
+
+
+        };
+
+    }
+
+
+
+
+    const failures =
+        evidence.filter(
+            e =>
+                e.result?.success === false
+        );
+
+
+
+    if (failures.length === evidence.length) {
+
+
+        const message =
+            failures
+                .map(
+                    f =>
+                        `${f.tool}: ${f.result.error}`
+                )
+                .join("\n");
+
+
+
+        return {
+
+
+            ...state,
+
+
+            finalResponse:
+                message
+
+
+        };
+
+    }
+
+
+
+
+    console.log(
+        "🧠 Generating final response..."
+    );
+
+
+
+
+
+    // -----------------------------
+    // Build clean repository context
+    // -----------------------------
+
+
+    const repositoryEvidence =
+        evidence.map(e => {
+
+
+            if (
+                e.tool === "readFileTool" &&
+                e.result?.success
+            ) {
+
+
+                return {
+
+
+                    tool:
+                        e.tool,
+
+
+                    file:
+                        e.result.data.path,
+
+
+                    content:
+                        e.result.data.content
+
+
+                };
+
+            }
+
+
+
+
+            if (
+                e.tool === "discoverRepositoryTool" &&
+                e.result?.success
+            ) {
+
+
+                return {
+
+
+                    tool:
+                        e.tool,
+
+
+                    repository:
+                        e.result.data.repository,
+
+
+                    language:
+                        e.result.data.repositoryInfo?.language,
+
+
+                    recommendedFiles:
+                        e.result.data.recommendedFiles,
+
+
+                    rootFiles:
+                        e.result.data.rootFiles
+
+
+                };
+
+            }
+
+
+
+
+
+            return {
+
+
+                tool:
+                    e.tool,
+
+
+                result:
+                    e.result
+
+
+            };
+
+
+        });
+
+
+
+
+
+
+    const answer =
+        await aiService.chat({
+
+
+            systemPrompt:`
+
+You are Samvaad AI.
+
+Answer the user's repository question using ONLY the provided repository evidence.
+
+Rules:
+
+- Do not invent information.
+- Mention files that were actually analyzed.
+- Combine information from multiple files naturally.
+- If evidence is insufficient, clearly say so.
+- Provide technical details when architecture questions are asked.
+
+`,
+
+
+
+            userPrompt:`
+
 QUESTION:
-${state.input || ""}
 
-EVIDENCE (Repository metadata and content):
-${JSON.stringify(state.evidence || [], null, 2)}
+${state.input}
 
-Provide a comprehensive answer to the question based on the evidence above.
-    `
-  });
 
-  // Clean simple markdown fences and trim
-  const cleaned = (typeof result === "string"
-    ? result.replace(/```/g, "").trim()
-    : JSON.stringify(result));
+REPOSITORY EVIDENCE:
 
-  console.log("STAGE: Final [LLM Response]");
-  console.log("OUTPUT:\n", cleaned);
+${JSON.stringify(
+    repositoryEvidence,
+    null,
+    2
+)}
 
-  return {
-    ...state,
-    finalResponse: cleaned,
-    action: "end"
-  };
+`
+
+        });
+
+
+
+
+
+    const cleaned =
+
+        typeof answer === "string"
+
+            ? answer
+                .replace(/```/g,"")
+                .trim()
+
+            :
+
+            JSON.stringify(answer);
+
+
+
+
+
+    return {
+
+
+        ...state,
+
+
+        finalResponse:
+            cleaned
+
+
+    };
+
 }

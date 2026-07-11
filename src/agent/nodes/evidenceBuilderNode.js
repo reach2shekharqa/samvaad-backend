@@ -1,60 +1,136 @@
 export async function evidenceBuilderNode(state) {
 
-  if (!state.toolResults || !state.plan) {
-    return state;
-  }
+    if (!state.toolResults || !state.plan) {
+        return state;
+    }
 
-  // -----------------------------
-  // SAFE INIT (CRITICAL FIX)
-  // -----------------------------
-  if (!state.evidence) {
-    state.evidence = {};
-  }
 
-  if (!Array.isArray(state.evidence.items)) {
-    state.evidence.items = [];
-  }
+    // -----------------------------
+    // SAFE INIT
+    // -----------------------------
 
-  if (!state.evidence.summary) {
-    state.evidence.summary = null;
-  }
+    if (!state.evidence) {
+        state.evidence = {
+            items: [],
+            summary: null
+        };
+    }
 
-  const items = state.evidence.items;
 
-  switch (state.plan.tool) {
+    if (!Array.isArray(state.evidence.items)) {
+        state.evidence.items = [];
+    }
 
-    case "discoverRepositoryTool":
-      items.push({
-        type: "repo",
-        tree: state.toolResults?.tree || []
-      });
-      break;
 
-    case "readFileTool":
-      items.push({
-        type: "file",
-        filePath: state.plan.input?.filePath,
-        content: state.toolResults?.content || "",
-        success: state.toolResults?.success
-      });
-      break;
+    const items = [
+        ...state.evidence.items
+    ];
 
-    default:
-      items.push({
-        type: "tool",
-        tool: state.plan.tool,
-        result: state.toolResults
-      });
-  }
 
-  return {
-    ...state,
 
-    evidence: {
-      ...state.evidence,
-      items
-    },
+    switch (state.plan.tool) {
 
-    toolResults: {}
-  };
+
+        case "discoverRepositoryTool":
+
+
+            items.push({
+
+                type: "repo",
+
+                totalFiles:
+                    state.toolResults?.data?.totalFiles || 0,
+
+
+                totalDirectories:
+                    state.toolResults?.data?.totalDirectories || 0,
+
+
+                recommendedFiles:
+                    state.toolResults?.data?.recommendedFiles || [],
+
+
+                repositoryInfo:
+                    state.toolResults?.data?.repositoryInfo || {}
+
+            });
+
+
+            break;
+
+
+
+        case "readFileTool":
+
+
+            const content =
+                state.toolResults?.data?.content || "";
+
+
+            items.push({
+
+                type: "file",
+
+                filePath:
+                    state.plan.input?.filePath,
+
+
+                contentLength:
+                    content.length,
+
+
+                // keep only useful context
+                content:
+                    content.substring(0,2000),
+
+
+                success:
+                    state.toolResults?.success
+
+            });
+
+
+            break;
+
+
+
+        default:
+
+
+            items.push({
+
+                type:"tool",
+
+                tool:
+                    state.plan.tool,
+
+
+                result:
+                    state.toolResults
+
+            });
+
+    }
+
+
+
+    return {
+
+        ...state,
+
+
+        evidence: {
+
+            ...state.evidence,
+
+            items
+
+        },
+
+
+        // clear old tool result
+        toolResults:{}
+
+    };
+
 }
