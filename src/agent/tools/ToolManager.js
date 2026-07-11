@@ -36,7 +36,8 @@ class ToolManager {
     }
 
 
-    async execute(name, input, context) {
+    async execute(name, input = {}, context = {}) {
+
 
         const tool = this.tools.get(name);
 
@@ -50,28 +51,57 @@ class ToolManager {
         }
 
 
-        if (typeof tool.execute !== "function") {
-
-            throw new Error(
-                `Tool '${name}' does not support execute()`
-            );
-
-        }
-
-
         try {
 
-            return await tool.execute(
-                input,
-                context
+
+            // New standard
+            if (typeof tool.invoke === "function") {
+
+
+                return await tool.invoke(
+
+                    input,
+
+                    context
+
+                );
+
+            }
+
+
+
+            // Backward compatibility
+            if (typeof tool.execute === "function") {
+
+
+                return await tool.execute(
+
+                    input,
+
+                    context
+
+                );
+
+            }
+
+
+
+            throw new Error(
+
+                `Tool '${name}' has no invoke() or execute() method`
+
             );
+
 
         }
 
         catch(err) {
 
+
             throw new Error(
-                `Tool '${name} failed: ${err.message}`
+
+                `Tool '${name}' failed: ${err.message}`
+
             );
 
         }
@@ -85,8 +115,9 @@ class ToolManager {
 const toolManager = new ToolManager();
 
 
-// Register all tools once
+
 const tools = registerTools();
+
 
 
 tools.forEach(tool => {
@@ -96,10 +127,17 @@ tools.forEach(tool => {
 });
 
 
+
 console.log(
+
     "ToolManager Loaded:",
-    toolManager.getAll().map(t => t.name)
+
+    toolManager
+        .getAll()
+        .map(t => t.name)
+
 );
+
 
 
 export default toolManager;

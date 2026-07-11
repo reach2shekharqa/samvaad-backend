@@ -1,7 +1,9 @@
 import { buildSamvaadGraph } from "./graph.js";
+import { buildLocalGraph } from "./localgraph.js";
 
 
 let developerGraph = null;
+let localGraph = null;
 
 
 export function getWorkspaceGraph(workspace) {
@@ -19,9 +21,18 @@ export function getWorkspaceGraph(workspace) {
 
 
         case "local":
-            throw new Error(
-                `Workspace "local" is not configured. Missing local graph implementation.`
-            );
+
+
+    if(!localGraph){
+
+        console.log("🚀 Building Local Graph");
+
+        localGraph = buildLocalGraph();
+
+    }
+
+
+    return localGraph;
 
         case "day":
             throw new Error(

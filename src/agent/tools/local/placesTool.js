@@ -30,13 +30,48 @@ function resolveCategory(category) {
 }
 
 
+
 export async function searchPlaces({
     query,
     lat,
     lon
 }) {
 
+
+    console.log(
+        "🔎 Searching Places:",
+        {
+            query,
+            lat,
+            lon
+        }
+    );
+
+
     // tumhara existing Geoapify code yaha same rahega
+
+
+}
+
+
+
+async function invoke(input) {
+
+
+    return await searchPlaces({
+
+        query:
+            input.query,
+
+
+        lat:
+            input.location?.lat,
+
+
+        lon:
+            input.location?.lon
+
+    });
 
 }
 
@@ -44,22 +79,12 @@ export async function searchPlaces({
 
 export default {
 
-    name: "placesTool",
+    name:"placesTool",
 
-    description: "Search nearby places",
+    description:
+        "Search nearby places",
 
-    async execute(input, context) {
 
-        return await searchPlaces({
-
-            query: input.query,
-
-            lat: context?.location?.lat,
-
-            lon: context?.location?.lon
-
-        });
-
-    }
+    invoke
 
 };

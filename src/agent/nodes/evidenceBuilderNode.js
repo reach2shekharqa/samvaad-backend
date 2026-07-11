@@ -31,6 +31,23 @@ export async function evidenceBuilderNode(state) {
     switch (state.plan.tool) {
 
 
+        case "placesSearchTool":
+
+            items.push({
+
+                type: "places",
+
+                query: state.input,
+
+                places:
+                    state.toolResults?.places ||
+                    state.toolResults?.data ||
+                    state.toolResults
+
+            });
+
+            break;
+
         case "discoverRepositoryTool":
 
 
@@ -81,7 +98,7 @@ export async function evidenceBuilderNode(state) {
 
                 // keep only useful context
                 content:
-                    content.substring(0,2000),
+                    content.substring(0, 2000),
 
 
                 success:
@@ -99,7 +116,7 @@ export async function evidenceBuilderNode(state) {
 
             items.push({
 
-                type:"tool",
+                type: "tool",
 
                 tool:
                     state.plan.tool,
@@ -129,8 +146,14 @@ export async function evidenceBuilderNode(state) {
 
 
         // clear old tool result
-        toolResults:{}
+        toolResults: {}
 
     };
 
+
+
 }
+console.log(
+    "CURRENT EVIDENCE:",
+    JSON.stringify(state.evidence, null, 2)
+);

@@ -47,37 +47,42 @@ export async function plannerNode(state) {
     // -----------------------------
 
 
-    if (!hasDiscovery) {
+   if (!hasDiscovery) {
 
 
-        console.log(
-            "🧠 Planner -> discoverRepositoryTool"
-        );
+    console.log(
+        "🧠 Planner -> discoverRepositoryTool"
+    );
 
 
-        return {
+    return {
 
-            ...state,
+        ...state,
 
-            action: "tool",
+        action: "tool",
 
 
-            tools: [
+        tools: [
 
-                {
+            {
 
-                    name:
-                        "discoverRepositoryTool",
+                name:
+                    "discoverRepositoryTool",
 
-                    input: {}
+                input: {
+
+                    github:
+                        state.context?.github
 
                 }
 
-            ]
+            }
 
-        };
+        ]
 
-    }
+    };
+
+}
 
 
 

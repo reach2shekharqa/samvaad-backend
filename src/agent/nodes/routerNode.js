@@ -1,95 +1,110 @@
 export async function routerNode(state) {
 
+
     const iteration = (state.iteration || 0) + 1;
+
 
     console.log(
         `🧭 Router | Iteration: ${iteration} | Action: ${state.action}`
     );
 
 
+
     if (iteration >= 5) {
 
-        console.log("🛑 Max iterations reached.");
+
+        console.log(
+            "🛑 Max iterations reached."
+        );
+
 
         return {
 
-            ...state,
-
             iteration,
 
-            action: "final",
+            action:"final",
 
-            route: "final"
+            route:"final"
 
         };
+
     }
 
 
-    switch (state.action) {
+
+    switch(state.action){
+
 
 
         case "tool":
 
-            return {
 
-                ...state,
+            return {
 
                 iteration,
 
-                action: "tool",
+                action:"tool",
 
-                route: "tool"
+                route:"tool"
 
             };
+
+
+
+        case "finish":   // ✅ ADD THIS
 
 
         case "final":
 
-            return {
 
-                ...state,
+            return {
 
                 iteration,
 
-                action: "final",
+                action:"final",
 
-                route: "final"
+                route:"final"
 
             };
+
 
 
         case "planner":
 
-            return {
 
-                ...state,
+            return {
 
                 iteration,
 
-                action: "planner",
+                action:"planner",
 
-                route: "planner"
+                route:"planner"
 
             };
 
 
+
         default:
+
 
             console.log(
                 `⚠️ Unknown action '${state.action}', switching to final.`
             );
 
-            return {
 
-                ...state,
+
+            return {
 
                 iteration,
 
-                action: "final",
+                action:"final",
 
-                route: "final"
+                route:"final"
 
             };
+
+
     }
+
 
 }

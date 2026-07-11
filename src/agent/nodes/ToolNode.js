@@ -1,143 +1,183 @@
-import toolManager from "../tools/ToolManager.js";
+import discoverRepositoryTool
+    from "../tools/developer/discoverRepositoryTool.js";
+
+import readFileTool
+    from "../tools/developer/readFileTool.js";
+
+
+const toolRegistry = {
+
+    discoverRepositoryTool,
+
+    readFileTool
+
+};
+
+
 
 export async function toolNode(state) {
 
-    const tool = state.tools?.[0];
+
+    console.log(
+        "🔧 TOOL NODE"
+    );
+
+
+
+    const tools =
+        state.tools || [];
+
+
+
+    if (tools.length === 0) {
+
+
+        console.log(
+            "❌ No tool selected"
+        );
+
+
+        return {
+
+            ...state,
+
+            action: "finish"
+
+        };
+
+    }
+
+
+
+
+    const selectedTool =
+        tools[0];
+
+
+
+    console.log(
+        "📋 SELECTED TOOL:",
+        JSON.stringify(selectedTool, null, 2)
+    );
+
+
+
+
+    const tool =
+        toolRegistry[selectedTool.name];
+
+
 
     if (!tool) {
 
-        console.log("⚠️ No tool selected.");
+
+        console.log(
+            "❌ Tool not registered:",
+            selectedTool.name
+        );
+
 
         return {
 
             ...state,
 
-            action: "final"
+            action: "finish"
 
         };
+
     }
 
-    console.log("\n==============================");
-    console.log(`🔧 TOOL: ${tool.name}`);
-    console.log("==============================");
 
-    // Build GitHub context
-    const github =
-        state.github ||
-        state.context?.github ||
-        {};
 
-    console.log("GitHub:");
-
-    console.dir({
-
-        owner: github.owner,
-
-        repo: github.repo,
-
-        token: github.token ? "***" : null
-
-    });
 
     try {
 
-        const input = {
 
-            github,
+        console.log(
+            "🚀 Executing:",
+            tool.name
+        );
 
-            ...(tool.input || {}),
 
-            context: state.context,
-
-            input: state.input
-
-        };
 
         const result =
-            await toolManager.execute(
+            await tool.execute(
 
-                tool.name,
+                {
+                    ...selectedTool.input,
 
-                input
+                    github:
+                        state.context?.github
+                }
 
             );
 
-        console.log(`✅ ${tool.name} completed`);
 
-        const evidence = [
-
-            ...(state.evidence || []),
-
-            {
-
-                tool: tool.name,
-
-                input: tool.input || {},
-
-                result
-
-            }
-
-        ];
 
         console.log(
-            `📚 Evidence Count: ${evidence.length}`
+            "📦 Tool output:",
+            JSON.stringify(result, null, 2)
         );
+
+
+
+
+        const evidence =
+            state.evidence || [];
+
+
+
+        evidence.push({
+
+            tool:
+                tool.name,
+
+            result
+
+        });
+
+
+
 
         return {
 
+
             ...state,
+
 
             evidence,
 
+
             tools: [],
+
 
             action: "planner"
 
         };
 
-    }
 
-    catch (err) {
+    }
+    catch (error) {
+
 
         console.error(
-            `❌ ${tool.name} failed`
+            "❌ TOOL ERROR:",
+            error.message
         );
 
-        console.error(err);
 
         return {
 
+
             ...state,
 
-            evidence: [
-
-                ...(state.evidence || []),
-
-                {
-
-                    tool: tool.name,
-
-                    input: tool.input || {},
-
-                    result: {
-
-                        success: false,
-
-                        error: err.message
-
-                    }
-
-                }
-
-            ],
-
-            tools: [],
 
             action: "final"
 
         };
 
+
     }
+
 
 }
