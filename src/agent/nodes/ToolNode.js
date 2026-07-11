@@ -4,12 +4,27 @@ import discoverRepositoryTool
 import readFileTool
     from "../tools/developer/readFileTool.js";
 
+import placesSearchTool
+    from "../tools/local/placesSearchTool.js";
+
+import placesTool
+    from "../tools/local/placesTool.js";
+
+import horaTool
+    from "../tools/day/horaTool.js";
+
 
 const toolRegistry = {
 
     discoverRepositoryTool,
 
-    readFileTool
+    readFileTool,
+
+    placesSearchTool,
+
+    placesTool,
+
+    horaTool
 
 };
 
@@ -17,25 +32,25 @@ const toolRegistry = {
 
 export async function toolNode(state) {
 
-
     console.log(
         "🔧 TOOL NODE"
     );
 
 
 
-    const tools =
-        state.tools || [];
+    const selectedTool =
+        state.tools?.[0];
 
 
 
-    if (tools.length === 0) {
-
+    if (
+        !selectedTool ||
+        !selectedTool.name
+    ) {
 
         console.log(
             "❌ No tool selected"
         );
-
 
         return {
 
@@ -48,18 +63,9 @@ export async function toolNode(state) {
     }
 
 
-
-
-    const selectedTool =
-        tools[0];
-
-
-
-    console.log(
-        "📋 SELECTED TOOL:",
-        JSON.stringify(selectedTool, null, 2)
-    );
-
+    console.log({
+        name: selectedTool.name
+    });
 
 
 
@@ -70,12 +76,10 @@ export async function toolNode(state) {
 
     if (!tool) {
 
-
         console.log(
             "❌ Tool not registered:",
-            selectedTool.name
+            selectedTool.tool
         );
-
 
         return {
 
@@ -89,9 +93,7 @@ export async function toolNode(state) {
 
 
 
-
     try {
-
 
         console.log(
             "🚀 Executing:",
@@ -100,26 +102,35 @@ export async function toolNode(state) {
 
 
 
-        const result =
-            await tool.execute(
-
-                {
-                    ...selectedTool.input,
-
-                    github:
-                        state.context?.github
-                }
-
-            );
+        // All Samvaad tools use invoke(input, context)
+        let result;
 
 
+        if (typeof tool === "function") {
 
-        console.log(
-            "📦 Tool output:",
-            JSON.stringify(result, null, 2)
+            result =
+                await tool(
+                    selectedTool.input,
+                    state.context || {}
+                );
+
+        }
+        else if (typeof tool.execute === "function") {
+
+    result =
+        await tool.execute(
+            selectedTool.input,
+            state.context || {}
         );
 
+}
+        else {
 
+            throw new Error(
+                "Invalid tool format"
+            );
+
+        }
 
 
         const evidence =
@@ -138,46 +149,34 @@ export async function toolNode(state) {
 
 
 
-
         return {
-
 
             ...state,
 
-
             evidence,
 
-
-            tools: [],
-
+            plan: null,
 
             action: "planner"
 
         };
 
-
     }
     catch (error) {
-
 
         console.error(
             "❌ TOOL ERROR:",
             error.message
         );
 
-
         return {
-
 
             ...state,
 
-
-            action: "final"
+            action: "finish"
 
         };
 
-
     }
-
 
 }

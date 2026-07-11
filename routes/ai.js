@@ -477,47 +477,50 @@ Rules:
       // -----------------------------
       const initialState = {
 
-        input:
-          typeof plannerInput === "string" && plannerInput.length > 0
+    input:
+        typeof plannerInput === "string" && plannerInput.length > 0
             ? plannerInput
             : safeQuestion,
 
+    intent: detected,
+
+    context: {
+
+        sessionId,
+
+        repoName,
+
+        // ✅ Add intent to context so planner/tools can access it
         intent: detected,
-
-        context: {
-
-          sessionId,
-
-          repoName,
-
-          ...workspaceContext,
-
-          // Always use the latest detected location
-          location: userLocation
-
-        },
 
         ...workspaceContext,
 
-        plan: {},
+        // Always use the latest detected location
+        location: userLocation
 
-        toolResults: {},
+    },
 
-        evidence: [],
+    ...workspaceContext,
 
-        memory: {},
+    plan: {},
 
-        action: "",
+    toolResults: {},
 
-        iteration: 0,
+    evidence: [],
 
-        maxIterations: 5,
+    memory: {},
 
-        finalResponse: "",
+    action: "",
 
-        executedTools: []
+    iteration: 0,
 
-      };
+    maxIterations: 5,
+
+    finalResponse: "",
+
+    executedTools: []
+
+};
 
       // -----------------------------
       // RUN GRAPH

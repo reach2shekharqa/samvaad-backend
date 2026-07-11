@@ -347,4 +347,11 @@ async function execute({ github }) {
 
 
 
-export default discoverRepositoryTool;
+export default {
+    name: "discoverRepositoryTool",
+
+    description:
+        "Discover repository structure and important files.",
+
+    execute
+};

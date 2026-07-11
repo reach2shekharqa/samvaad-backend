@@ -8,6 +8,10 @@ export async function plannerNode(state) {
         state.evidence || [];
 
 
+    const iteration =
+        (state.iteration || 0) + 1;
+
+
 
     const hasDiscovery =
         evidence.some(
@@ -18,7 +22,7 @@ export async function plannerNode(state) {
 
 
 
-    if ((state.iteration || 0) >= 5) {
+    if (iteration >= 5) {
 
 
         console.log(
@@ -29,6 +33,8 @@ export async function plannerNode(state) {
         return {
 
             ...state,
+
+            iteration,
 
             action: "final",
 
@@ -47,42 +53,44 @@ export async function plannerNode(state) {
     // -----------------------------
 
 
-   if (!hasDiscovery) {
+    if (!hasDiscovery) {
 
 
-    console.log(
-        "🧠 Planner -> discoverRepositoryTool"
-    );
+        console.log(
+            "🧠 Planner -> discoverRepositoryTool"
+        );
 
 
-    return {
+        return {
 
-        ...state,
+            ...state,
 
-        action: "tool",
+            iteration,
+
+            action: "tool",
 
 
-        tools: [
+            tools: [
 
-            {
+                {
 
-                name:
-                    "discoverRepositoryTool",
+                    name:
+                        "discoverRepositoryTool",
 
-                input: {
+                    input: {
 
-                    github:
-                        state.context?.github
+                        github:
+                            state.context?.github
+
+                    }
 
                 }
 
-            }
+            ]
 
-        ]
+        };
 
-    };
-
-}
+    }
 
 
 
@@ -97,23 +105,35 @@ export async function plannerNode(state) {
 
 
 
+
     // -----------------------------
     // Already read files
     // -----------------------------
 
 
     const readFiles =
-        (state.evidence?.items || [])
-            .filter(
-                e =>
-                    e.type === "file" &&
-                    e.success
+        [
+            ...new Set(
+                evidence
+                    .filter(
+                        e =>
+                            e.type === "file" &&
+                            e.success
+                    )
+                    .map(
+                        e =>
+                            e.filePath
+                    )
+                    .filter(Boolean)
             )
-            .map(
-                e =>
-                    e.filePath
-            )
-            .filter(Boolean);
+        ];
+
+
+
+    console.log(
+        "📚 Already Read Files:",
+        readFiles
+    );
 
 
 
@@ -140,9 +160,10 @@ export async function plannerNode(state) {
 
 
 
+
     // -----------------------------
     // STEP 3
-    // Fallback root files
+    // Root files fallback
     // -----------------------------
 
 
@@ -184,6 +205,13 @@ export async function plannerNode(state) {
 
     }
 
+    if (
+        readFiles.includes(nextFile)
+    ) {
+
+        nextFile = null;
+
+    }
 
 
 
@@ -203,6 +231,7 @@ export async function plannerNode(state) {
 
             ...state,
 
+            iteration,
 
             action: "tool",
 
@@ -211,11 +240,16 @@ export async function plannerNode(state) {
 
                 {
 
-                    name: "readFileTool",
+                    name:
+                        "readFileTool",
 
                     input: {
 
-                        filePath: nextFile
+                        github:
+                            state.context?.github,
+
+                        filePath:
+                            nextFile
 
                     }
 
@@ -226,6 +260,8 @@ export async function plannerNode(state) {
         };
 
     }
+
+
 
 
 
@@ -255,7 +291,7 @@ Rules:
 - Prefer source entry points or configuration files.
 - If nothing useful exists return final.
 
-Return ONLY JSON:
+Return ONLY JSON.
 
 {
  "action":"tool",
@@ -263,8 +299,9 @@ Return ONLY JSON:
    {
     "name":"readFileTool",
     "input":{
-      "filePath":"..."
-    }
+    "github": "...",
+    "filePath":"..."
+}
    }
  ]
 }
@@ -278,18 +315,15 @@ or
 `,
 
 
-            userPrompt: JSON.stringify({
+            userPrompt:
+                JSON.stringify({
 
-                question: state.input,
+                    question:
+                        state.input,
 
-                evidence: {
+                    evidence
 
-                    items:
-                        state.evidence?.items || []
-
-                }
-
-            })
+                })
 
         });
 
@@ -314,7 +348,8 @@ or
             );
 
 
-    } catch {
+    }
+    catch {
 
 
         parsed = {
@@ -335,7 +370,10 @@ or
 
 
 
-    if (!["tool", "final"].includes(action)) {
+    if (
+        !["tool", "final"]
+            .includes(action)
+    ) {
 
         action = "final";
 
@@ -351,18 +389,46 @@ or
 
 
 
-    return {
+    const tools =
+        (parsed.tools || []).map(tool => {
 
+            if (
+                tool.name === "readFileTool"
+            ) {
+
+                return {
+
+                    ...tool,
+
+                    input: {
+
+                        github:
+                            state.context?.github,
+
+                        ...tool.input
+
+                    }
+
+                };
+
+            }
+
+
+            return tool;
+
+        });
+
+
+
+    return {
 
         ...state,
 
+        iteration,
 
         action,
 
-
-        tools:
-            parsed.tools || []
-
+        tools
 
     };
 

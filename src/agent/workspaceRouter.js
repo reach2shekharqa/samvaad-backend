@@ -23,22 +23,28 @@ export function getWorkspaceGraph(workspace) {
         case "local":
 
 
-    if(!localGraph){
+            if (!localGraph) {
 
-        console.log("🚀 Building Local Graph");
+                console.log("🚀 Building Local Graph");
 
-        localGraph = buildLocalGraph();
+                localGraph = buildLocalGraph();
 
-    }
+            }
 
 
-    return localGraph;
+            return localGraph;
 
         case "day":
-            throw new Error(
-                `Workspace "day" is not configured. Missing day graph implementation.`
-            );
 
+            if (!localGraph) {
+
+                console.log("🚀 Building Local Graph");
+
+                localGraph = buildLocalGraph();
+
+            }
+
+            return localGraph;
 
         default:
 

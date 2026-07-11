@@ -1,77 +1,99 @@
 import aiService from "../../agent/ai/AIService.js";
 
-
 export async function localPlannerNode(state) {
 
+    // console.log(
+    //     "🧠 LOCAL PLANNER"
+    // );
 
-    console.log(
-        "🧠 LOCAL PLANNER"
-    );
-
-
+    // console.log(
+    //     "Evidence:",
+    //     JSON.stringify(state.evidence, null, 2)
+    // );
 
     // -----------------------------
     // Evidence available
     // -----------------------------
-
     if (
-        state.evidence?.items &&
-        state.evidence.items.length > 0
+        Array.isArray(state.evidence) &&
+        state.evidence.length > 0
     ) {
 
         console.log(
             "✅ Evidence found, finishing"
         );
 
-
         return {
 
-            action:"finish"
+            action: "finish"
 
         };
 
     }
 
+    // ------------------------------------
+    // Direct routing for day queries
+    // ------------------------------------
+    if (state.context?.intent === "day_query") {
 
+        console.log(
+            "🕒 Day query detected -> horaTool"
+        );
 
+        return {
+
+            iteration:
+                (state.iteration || 0) + 1,
+
+            plan: {
+
+                tool: "horaTool",
+
+                input: {
+
+                    latitude:
+                        state.context.location.latitude,
+
+                    longitude:
+                        state.context.location.longitude
+
+                }
+
+            },
+
+            action: "tool"
+
+        };
+
+    }
 
     // -----------------------------
     // Safety limit
     // -----------------------------
-
-    if(
+    if (
         state.iteration >= 3
-    ){
+    ) {
 
         console.log(
             "⚠️ Max iteration reached"
         );
 
-
         return {
 
-            action:"finish"
+            action: "finish"
 
         };
 
     }
 
-
-
-
-
     console.log(
         "🤖 Asking LLM for tool decision"
     );
 
-
-
-
     const decision =
         await aiService.chat({
 
-
-            systemPrompt:`
+            systemPrompt: `
 
 You are a local search planner.
 
@@ -82,7 +104,6 @@ Return ONLY JSON.
 Available tool:
 
 placesSearchTool
-
 
 Category mapping:
 
@@ -110,7 +131,6 @@ service.financial.atm
 bank:
 service.financial.bank
 
-
 JSON format:
 
 {
@@ -121,125 +141,76 @@ JSON format:
 
 `,
 
-
-            userPrompt:
-
-`
+            userPrompt: `
 User request:
 
 ${state.input}
 `,
 
-            temperature:0
-
+            temperature: 0
 
         });
 
-
-
-
-
     let parsed;
-
-
 
     try {
 
-
         parsed =
             typeof decision === "string"
-
-            ?
-            JSON.parse(
-                decision
-            )
-
-            :
-            decision;
-
+                ? JSON.parse(decision)
+                : decision;
 
     }
-    catch(error){
-
+    catch (error) {
 
         console.log(
             "⚠️ LLM JSON parse failed"
         );
 
+        parsed = {
 
-        parsed={
+            tool: "placesSearchTool",
 
-            tool:"placesSearchTool",
+            category: "healthcare.hospital",
 
-            category:
-            "healthcare.hospital",
-
-            query:
-            state.input
+            query: state.input
 
         };
 
     }
-
-
-
-
 
     console.log(
         "🤖 Planner Decision:",
         parsed
     );
 
-
-
-
-
     return {
 
-
         iteration:
-            (state.iteration || 0)+1,
+            (state.iteration || 0) + 1,
 
+        plan: {
 
+            tool: parsed.tool,
 
-        plan:{
-
-
-            tool:
-                parsed.tool,
-
-
-
-            input:{
-
+            input: {
 
                 query:
-                    parsed.query
-                    ||
+                    parsed.query ||
                     state.input,
-
-
 
                 category:
                     parsed.category,
 
-
-
                 location:
                     state.context?.location
 
-
             }
-
 
         },
 
-
-
-        action:"tool"
-
+        action: "tool"
 
     };
-
 
 }
