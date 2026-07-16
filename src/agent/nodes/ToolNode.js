@@ -14,6 +14,7 @@ import horaTool
     from "../tools/day/horaTool.js";
 
 
+
 const toolRegistry = {
 
     discoverRepositoryTool,
@@ -30,16 +31,52 @@ const toolRegistry = {
 
 
 
+
 export async function toolNode(state) {
+
 
     console.log(
         "🔧 TOOL NODE"
     );
 
 
+    console.log(
+        "STATE PLAN:",
+        JSON.stringify(state.plan, null, 2)
+    );
+
+
+    console.log(
+        "STATE TOOLS:",
+        JSON.stringify(state.tools, null, 2)
+    );
+
+
+
+    // --------------------------------
+    // Support both architectures
+    // Developer:
+    // state.tools[0]
+    //
+    // Local/Day:
+    // state.plan
+    // --------------------------------
 
     const selectedTool =
-        state.tools?.[0];
+        state.tools?.[0]
+        ||
+        (
+            state.plan
+                ? {
+                    name:
+                        state.plan.tool,
+
+                    input:
+                        state.plan.input
+                }
+                : null
+        );
+
 
 
 
@@ -48,24 +85,34 @@ export async function toolNode(state) {
         !selectedTool.name
     ) {
 
+
         console.log(
             "❌ No tool selected"
         );
+
 
         return {
 
             ...state,
 
-            action: "finish"
+            action:"finish"
 
         };
 
     }
 
 
-    console.log({
-        name: selectedTool.name
-    });
+
+
+    console.log(
+        "📋 SELECTED TOOL:",
+        JSON.stringify(
+            selectedTool,
+            null,
+            2
+        )
+    );
+
 
 
 
@@ -74,18 +121,21 @@ export async function toolNode(state) {
 
 
 
+
     if (!tool) {
+
 
         console.log(
             "❌ Tool not registered:",
-            selectedTool.tool
+            selectedTool.name
         );
+
 
         return {
 
             ...state,
 
-            action: "finish"
+            action:"finish"
 
         };
 
@@ -93,7 +143,9 @@ export async function toolNode(state) {
 
 
 
+
     try {
+
 
         console.log(
             "🚀 Executing:",
@@ -102,20 +154,25 @@ export async function toolNode(state) {
 
 
 
-        // All Samvaad tools use invoke(input, context)
         let result;
 
 
+
+        // Function style tool
+
         if (typeof tool === "function") {
 
-            result =
-                await tool(
-                    selectedTool.input,
-                    state.context || {}
-                );
 
-        }
-        else if (typeof tool.execute === "function") {
+    result =
+        await tool(
+            selectedTool.input,
+            state.context || {}
+        );
+
+
+}
+else if (typeof tool.execute === "function") {
+
 
     result =
         await tool.execute(
@@ -123,60 +180,111 @@ export async function toolNode(state) {
             state.context || {}
         );
 
+
 }
-        else {
+else if (typeof tool.invoke === "function") {
 
-            throw new Error(
-                "Invalid tool format"
-            );
 
-        }
+    result =
+        await tool.invoke(
+            selectedTool.input,
+            state.context || {}
+        );
+
+
+}
+else {
+
+
+    console.log(
+        "INVALID TOOL OBJECT:",
+        tool
+    );
+
+
+    throw new Error(
+        "Invalid tool format"
+    );
+
+
+}
+
+
 
 
         const evidence =
-            state.evidence || [];
+            Array.isArray(state.evidence)
+                ? [
+                    ...state.evidence,
+                    {
+                        tool:
+                            tool.name,
+
+                        result
+                    }
+                ]
+                : [
+                    {
+                        tool:
+                            tool.name,
+
+                        result
+                    }
+                ];
 
 
-
-        evidence.push({
-
-            tool:
-                tool.name,
-
-            result
-
-        });
 
 
 
         return {
 
+
             ...state,
+
 
             evidence,
 
-            plan: null,
 
-            action: "planner"
+            // clear previous execution
+
+            plan:null,
+
+
+            tools:[],
+
+
+            toolResults:
+                result,
+
+
+            action:"planner"
+
 
         };
 
+
+
     }
-    catch (error) {
+    catch(error) {
+
 
         console.error(
             "❌ TOOL ERROR:",
             error.message
         );
 
+
+
         return {
 
             ...state,
 
-            action: "finish"
+            action:"finish"
 
         };
 
+
     }
+
 
 }
