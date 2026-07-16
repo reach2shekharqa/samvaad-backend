@@ -4,6 +4,8 @@ import cors from "cors";
 import crypto from "crypto";
 import dotenv from "dotenv";
 
+import pool from "./src/db/db.js";
+
 import aiRoutes from "./routes/ai.js";
 import sessionStore from "./store/SessionStore.js";
 
@@ -236,7 +238,13 @@ app.get("/repo/:sessionId/:repoName", async (req, res) => {
 app.get("/", (req, res) => {
     res.send("Samvaad Backend Running 🚀");
 });
-
+try {
+    await pool.query("SELECT NOW()");
+    console.log("✅ PostgreSQL is working");
+} catch (e) {
+    console.error("❌ PostgreSQL connection failed");
+    console.error(e);
+}
 /**
  * START SERVER
  */
