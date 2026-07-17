@@ -4,43 +4,87 @@ class SessionStore {
 
     async save(sessionId, session) {
 
-        await pool.query(
-            `
-            INSERT INTO sessions(session_id, username, session_data)
-            VALUES ($1,$2,$3)
-            ON CONFLICT(session_id)
-            DO UPDATE SET
-                username = EXCLUDED.username,
-                session_data = EXCLUDED.session_data
-            `,
-            [
-                sessionId,
-                session.user.login,
-                JSON.stringify(session)
-            ]
-        );
+        console.log("========== SESSION SAVE ==========");
+        console.log("Session ID:", sessionId);
+        console.log("Username:", session?.user?.login);
 
+        try {
+
+            const result = await pool.query(
+                `
+                INSERT INTO sessions(session_id, username, session_data)
+                VALUES ($1, $2, $3::jsonb)
+                ON CONFLICT(session_id)
+                DO UPDATE SET
+                    username = EXCLUDED.username,
+                    session_data = EXCLUDED.session_data
+                RETURNING session_id;
+                `,
+                [
+                    sessionId,
+                    session.user.login,
+                    JSON.stringify(session)
+                ]
+            );
+
+            console.log("✅ Session saved successfully");
+            console.log(result.rows);
+
+        } catch (err) {
+
+            console.error("❌ SAVE SESSION ERROR");
+            console.error(err);
+
+            throw err;
+        }
     }
 
     async get(sessionId) {
 
-        const result = await pool.query(
-            "SELECT session_data FROM sessions WHERE session_id=$1",
-            [sessionId]
-        );
+        console.log("========== SESSION GET ==========");
+        console.log("Session ID:", sessionId);
 
-        if (result.rows.length === 0) {
-            return null;
+        try {
+
+            const result = await pool.query(
+                `
+                SELECT session_data
+                FROM sessions
+                WHERE session_id = $1
+                `,
+                [sessionId]
+            );
+
+            console.log("Rows Found:", result.rowCount);
+
+            if (result.rowCount === 0) {
+                return null;
+            }
+
+            const data = result.rows[0].session_data;
+
+            return typeof data === "string"
+                ? JSON.parse(data)
+                : data;
+
+        } catch (err) {
+
+            console.error("❌ GET SESSION ERROR");
+            console.error(err);
+
+            throw err;
         }
-
-        return JSON.parse(result.rows[0].session_data);
-
     }
 
     async delete(sessionId) {
 
+        console.log("Deleting Session:", sessionId);
+
         await pool.query(
-            "DELETE FROM sessions WHERE session_id=$1",
+            `
+            DELETE FROM sessions
+            WHERE session_id=$1
+            `,
             [sessionId]
         );
 
@@ -48,8 +92,13 @@ class SessionStore {
 
     async clearAllForUser(username) {
 
+        console.log("Clearing sessions for:", username);
+
         await pool.query(
-            "DELETE FROM sessions WHERE username=$1",
+            `
+            DELETE FROM sessions
+            WHERE username=$1
+            `,
             [username]
         );
 
@@ -58,14 +107,21 @@ class SessionStore {
     async getAll() {
 
         const result = await pool.query(
-            "SELECT session_id, session_data FROM sessions"
+            `
+            SELECT session_id, session_data
+            FROM sessions
+            `
         );
 
         const sessions = {};
 
-        result.rows.forEach(row => {
-            sessions[row.session_id] = JSON.parse(row.session_data);
-        });
+        for (const row of result.rows) {
+
+            sessions[row.session_id] =
+                typeof row.session_data === "string"
+                    ? JSON.parse(row.session_data)
+                    : row.session_data;
+        }
 
         return sessions;
 
