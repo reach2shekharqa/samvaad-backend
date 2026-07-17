@@ -1,77 +1,73 @@
-import fs from "fs/promises";
-import path from "path";
-
-const SESSION_FILE = path.join(process.cwd(), "store", "sessions.json");
+import pool from "../src/db/db.js";
 
 class SessionStore {
 
-    async load() {
-
-        try {
-
-            const data = await fs.readFile(SESSION_FILE, "utf8");
-
-            return JSON.parse(data);
-
-        } catch {
-
-            return {};
-
-        }
-
-    }
-
-    async clearAllForUser(username) {
-    const all = await this.getAll();
-
-    for (const [sessionId, data] of Object.entries(all)) {
-        if (data.user?.login === username) {
-            await this.delete(sessionId);
-        }
-    }
-}
-
-    async saveAll(sessions) {
-
-        await fs.writeFile(
-            SESSION_FILE,
-            JSON.stringify(sessions, null, 2),
-            "utf8"
-        );
-
-    }
-
     async save(sessionId, session) {
 
-        const sessions = await this.load();
-
-        sessions[sessionId] = session;
-
-        await this.saveAll(sessions);
+        await pool.query(
+            `
+            INSERT INTO sessions(session_id, username, session_data)
+            VALUES ($1,$2,$3)
+            ON CONFLICT(session_id)
+            DO UPDATE SET
+                username = EXCLUDED.username,
+                session_data = EXCLUDED.session_data
+            `,
+            [
+                sessionId,
+                session.user.login,
+                JSON.stringify(session)
+            ]
+        );
 
     }
 
     async get(sessionId) {
 
-        const sessions = await this.load();
+        const result = await pool.query(
+            "SELECT session_data FROM sessions WHERE session_id=$1",
+            [sessionId]
+        );
 
-        return sessions[sessionId] || null;
+        if (result.rows.length === 0) {
+            return null;
+        }
+
+        return JSON.parse(result.rows[0].session_data);
 
     }
 
     async delete(sessionId) {
 
-        const sessions = await this.load();
+        await pool.query(
+            "DELETE FROM sessions WHERE session_id=$1",
+            [sessionId]
+        );
 
-        delete sessions[sessionId];
+    }
 
-        await this.saveAll(sessions);
+    async clearAllForUser(username) {
+
+        await pool.query(
+            "DELETE FROM sessions WHERE username=$1",
+            [username]
+        );
 
     }
 
     async getAll() {
 
-        return await this.load();
+        const result = await pool.query(
+            "SELECT session_id, session_data FROM sessions"
+        );
+
+        const sessions = {};
+
+        result.rows.forEach(row => {
+            sessions[row.session_id] = JSON.parse(row.session_data);
+        });
+
+        return sessions;
 
     }
 
