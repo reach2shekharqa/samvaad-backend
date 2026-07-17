@@ -477,50 +477,50 @@ Rules:
       // -----------------------------
       const initialState = {
 
-    input:
-        typeof plannerInput === "string" && plannerInput.length > 0
+        input:
+          typeof plannerInput === "string" && plannerInput.length > 0
             ? plannerInput
             : safeQuestion,
 
-    intent: detected,
-
-    context: {
-
-        sessionId,
-
-        repoName,
-
-        // ✅ Add intent to context so planner/tools can access it
         intent: detected,
+
+        context: {
+
+          sessionId,
+
+          repoName,
+
+          // ✅ Add intent to context so planner/tools can access it
+          intent: detected,
+
+          ...workspaceContext,
+
+          // Always use the latest detected location
+          location: userLocation
+
+        },
 
         ...workspaceContext,
 
-        // Always use the latest detected location
-        location: userLocation
+        plan: {},
 
-    },
+        toolResults: {},
 
-    ...workspaceContext,
+        evidence: [],
 
-    plan: {},
+        memory: {},
 
-    toolResults: {},
+        action: "",
 
-    evidence: [],
+        iteration: 0,
 
-    memory: {},
+        maxIterations: 5,
 
-    action: "",
+        finalResponse: "",
 
-    iteration: 0,
+        executedTools: []
 
-    maxIterations: 5,
-
-    finalResponse: "",
-
-    executedTools: []
-
-};
+      };
 
       // -----------------------------
       // RUN GRAPH
@@ -535,19 +535,34 @@ Rules:
 
       // Save last interaction for session context to help follow-ups
       try {
-        const updatedSession = {
-          ...session,
-          lastInteraction: {
-            lastIntent: detected,
-            repoName,
-            question: question || safeQuestion,
-            timestamp: Date.now()
-          }
-        };
 
-        await sessionStore.save(sessionId, updatedSession);
+        if (sessionId && session) {
+
+          const updatedSession = {
+            ...session,
+            lastInteraction: {
+              lastIntent: detected,
+              repoName,
+              question: question || safeQuestion,
+              timestamp: Date.now()
+            }
+          };
+
+          await sessionStore.save(sessionId, updatedSession);
+
+        } else {
+
+          console.log("Skipping session save - no authenticated session");
+
+        }
+
       } catch (e) {
-        console.warn("Failed to save session lastInteraction:", e && e.message ? e.message : e);
+
+        console.warn(
+          "Failed to save session lastInteraction:",
+          e && e.message ? e.message : e
+        );
+
       }
 
       return {
