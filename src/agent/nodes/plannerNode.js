@@ -1,69 +1,67 @@
 import aiService from "../ai/AIService.js";
 
+const MAX_ITERATIONS = 5;
+
+const PREFERRED_ROOT_FILES = [
+
+    "Dockerfile",
+    "docker-compose.yml",
+    "Makefile",
+
+    "settings.gradle",
+    "build.gradle",
+    "build.gradle.kts",
+
+    "pom.xml",
+
+    "package.json",
+
+    "requirements.txt",
+    "pyproject.toml",
+
+    "go.mod",
+
+    "Cargo.toml"
+
+];
 
 export async function plannerNode(state) {
 
-
     const evidence =
         state.evidence || [];
+
+    const iteration =
+        (state.iteration || 0) + 1;
+
     console.log("================================");
     console.log("🧠 PLANNER");
-    console.log("Iteration:", (state.iteration || 0) + 1);
+    console.log("Iteration :", iteration);
+
     console.log(
-        "Evidence:",
+        "Evidence :",
         evidence.map(e => ({
             tool: e.tool,
             success: e.result?.success
         }))
     );
+
     console.log("================================");
 
-    const iteration =
-        (state.iteration || 0) + 1;
+    //---------------------------------------
+    // Maximum Iterations
+    //---------------------------------------
 
-
-
-    const hasDiscovery =
-        evidence.some(
-            e =>
-                e.tool === "discoverRepositoryTool" &&
-                e.result?.success
-        );
-
-
-
-    if (iteration >= 5) {
-
+    if (iteration >= MAX_ITERATIONS) {
 
         console.log(
-            "🧠 Planner Action: final (max iterations)"
+            "🛑 Max iterations reached."
         );
 
-        if (action === "final") {
-
-            console.log(
-                "✅ Planner completed. Sending to response."
-            );
-
-        }
-
         return {
 
             ...state,
 
             iteration,
-
-            action,
-
-            tools
-
-        };
-        return {
-
-            ...state,
-
-            iteration,
-
 
             action: "final",
 
@@ -73,22 +71,26 @@ export async function plannerNode(state) {
 
     }
 
+    //---------------------------------------
+    // Repository Discovery
+    //---------------------------------------
 
+    const discoveryEvidence =
+        evidence.find(
 
+            e =>
+                e.tool === "discoverRepositoryTool"
 
-    // -----------------------------
-    // STEP 1
-    // Discover repository
-    // -----------------------------
+        );
 
-
-    if (!hasDiscovery) {
-
+    if (
+        !discoveryEvidence ||
+        !discoveryEvidence.result?.success
+    ) {
 
         console.log(
             "🧠 Planner -> discoverRepositoryTool"
         );
-
 
         return {
 
@@ -97,7 +99,6 @@ export async function plannerNode(state) {
             iteration,
 
             action: "tool",
-
 
             tools: [
 
@@ -121,173 +122,95 @@ export async function plannerNode(state) {
 
     }
 
-
-
-
-
-    if (discovery && !discovery.success) {
-
-        console.log(
-            "❌ Repository discovery failed:",
-            discovery.error
-        );
-
-        return {
-
-            ...state,
-
-            iteration,
-
-            action: "final",
-
-            tools: []
-
-        };
-
-    }
-
     const repository =
-        repository?.data;
+        discoveryEvidence.result.data;
 
+    //---------------------------------------
+    // Already Read Files
+    //---------------------------------------
 
+    const readFiles = [
 
+        ...new Set(
 
+            evidence
 
-    // -----------------------------
-    // Already read files
-    // -----------------------------
+                .filter(
 
+                    e =>
+                        e.tool === "readFileTool" &&
+                        e.result?.success
 
-    const readFiles =
-        [
-            ...new Set(
-                evidence
-                    .filter(
-                        e =>
-                            e.type === "file" &&
-                            e.success
-                    )
-                    .map(
-                        e =>
-                            e.filePath
-                    )
-                    .filter(Boolean)
-            )
-        ];
+                )
 
+                .map(
+                    e => e.result.data?.path
+                )
 
+                .filter(Boolean)
+
+        )
+
+    ];
 
     console.log(
-        "📚 Already Read Files:",
+        "📚 Already Read:",
         readFiles
     );
 
-
-
-
-
-
-    // -----------------------------
-    // STEP 2
-    // Recommended files first
-    // -----------------------------
-
-
-    const recommendedFiles =
-        repository?.recommendedFiles || [];
-
-    console.log(
-        "📄 Recommended Files:",
-        recommendedFiles
-    );
+    //---------------------------------------
+    // Recommended Files
+    //---------------------------------------
 
     let nextFile =
-        recommendedFiles.find(
-            file =>
-                !readFiles.includes(file)
-        );
+        (repository.recommendedFiles || [])
 
+            .find(
 
+                file =>
+                    !readFiles.includes(file)
 
+            );
 
-
-    // -----------------------------
-    // STEP 3
-    // Root files fallback
-    // -----------------------------
-
+    //---------------------------------------
+    // Root File Fallback
+    //---------------------------------------
 
     if (!nextFile) {
 
-
-        const rootFiles =
-            repository?.rootFiles || [];
-
-        console.log(
-            "📁 Root Files:",
-            rootFiles
-        );
-
-        const preferredRootFiles = [
-
-            "Dockerfile",
-            "docker-compose.yml",
-            "Makefile",
-            "settings.gradle",
-            "build.gradle",
-            "build.gradle.kts",
-            "pom.xml",
-            "package.json",
-            "requirements.txt",
-            "pyproject.toml",
-            "go.mod",
-            "Cargo.toml"
-
-        ];
-
-
-
         nextFile =
-            preferredRootFiles.find(
+            PREFERRED_ROOT_FILES.find(
 
                 file =>
-                    rootFiles.includes(file) &&
+
+                    repository.rootFiles.includes(file)
+
+                    &&
+
                     !readFiles.includes(file)
 
             );
 
     }
 
-    if (
-        readFiles.includes(nextFile)
-    ) {
-
-        nextFile = null;
-
-    }
-
-
-
+    //---------------------------------------
+    // If file found → read it
+    //---------------------------------------
 
     if (nextFile) {
 
-
         console.log(
-            "🧠 Planner -> readFileTool:",
+            "📄 Planner ->",
             nextFile
         );
 
-
-
         return {
-
 
             ...state,
 
             iteration,
 
             action: "tool",
-
 
             tools: [
 
@@ -299,7 +222,7 @@ export async function plannerNode(state) {
                     input: {
 
                         github:
-                            state.context?.github,
+                            state.context.github,
 
                         filePath:
                             nextFile
@@ -314,80 +237,83 @@ export async function plannerNode(state) {
 
     }
 
+    //---------------------------------------
+    // LLM Decision
+    //---------------------------------------
 
-
-
-
-
-
-    // -----------------------------
-    // STEP 4
-    // LLM fallback
-    // -----------------------------
-
-
-    const result =
+    console.log(
+        "🤖 Planner -> LLM"
+    );    const result =
         await aiService.chat({
-
 
             systemPrompt: `
 
 You are Samvaad Planner.
 
-Repository files are collected.
+The repository has already been discovered.
 
-Choose ONE file that will help understand repository architecture.
+Your job is to decide ONE next file that should be read to answer the user's question.
 
 Rules:
 
-- Select only from provided files.
-- Prefer source entry points or configuration files.
-- If nothing useful exists return final.
+- Return ONLY valid JSON.
+- Never explain.
+- Select ONLY ONE file.
+- Select ONLY from repository.files.
+- Never select a file already present in readFiles.
+- Prefer entry points, configuration files, source files and documentation.
+- If no additional file is useful, return final.
 
-Return ONLY JSON.
+Response format:
 
 {
- "action":"tool",
- "tools":[
-   {
-     "name":"readFileTool",
-     "input":{
-       "filePath":"..."
-     }
-   }
- ]
+  "action":"tool",
+  "tools":[
+    {
+      "name":"readFileTool",
+      "input":{
+        "filePath":"..."
+      }
+    }
+  ]
 }
 
-or
+OR
 
 {
- "action":"final"
+  "action":"final"
 }
 
 `,
 
+            userPrompt: JSON.stringify({
 
-            userPrompt:
-                JSON.stringify({
+                question: state.input,
 
-                    question:
-                        state.input,
+                repository: {
 
-                    evidence
+                    recommendedFiles:
+                        repository.recommendedFiles,
 
-                })
+                    rootFiles:
+                        repository.rootFiles,
+
+                    files:
+                        repository.files
+
+                },
+
+                readFiles
+
+            }),
+
+            temperature: 0
 
         });
 
-
-
-
-
     let parsed;
 
-
     try {
-
 
         parsed =
             JSON.parse(
@@ -399,10 +325,8 @@ or
 
             );
 
-
     }
     catch {
-
 
         parsed = {
 
@@ -412,15 +336,9 @@ or
 
     }
 
-
-
-
     let action =
         (parsed.action || "final")
             .toLowerCase();
-
-
-
 
     if (
         !["tool", "final"]
@@ -431,46 +349,79 @@ or
 
     }
 
-
-
-
-
-    console.log(
-        `🧠 Planner Action: ${action}`
-    );
-
-
-
     const tools =
-        (parsed.tools || []).map(tool => {
+        (parsed.tools || [])
 
-            if (
-                tool.name === "readFileTool"
-            ) {
+            .map(tool => {
+
+                if (
+                    tool.name !== "readFileTool"
+                ) {
+
+                    return null;
+
+                }
+
+                if (
+                    !tool.input?.filePath
+                ) {
+
+                    return null;
+
+                }
+
+                if (
+                    readFiles.includes(
+                        tool.input.filePath
+                    )
+                ) {
+
+                    return null;
+
+                }
 
                 return {
 
-                    ...tool,
+                    name: "readFileTool",
 
                     input: {
 
-                        ...tool.input,
-
                         github:
-                            state.context?.github
+                            state.context.github,
+
+                        filePath:
+                            tool.input.filePath
 
                     }
 
                 };
 
-            }
+            })
 
+            .filter(Boolean);
 
-            return tool;
+    if (
+        action === "tool" &&
+        tools.length === 0
+    ) {
 
-        });
+        action = "final";
 
+    }
 
+    console.log(
+        "🧠 Planner Action:",
+        action
+    );
+
+    if (tools.length) {
+
+        console.log(
+            "📄 Next File:",
+            tools[0].input.filePath
+        );
+
+    }
 
     return {
 
@@ -483,6 +434,5 @@ or
         tools
 
     };
-
 
 }

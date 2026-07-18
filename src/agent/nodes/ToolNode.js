@@ -13,8 +13,6 @@ import placesTool
 import horaTool
     from "../tools/day/horaTool.js";
 
-
-
 const toolRegistry = {
 
     discoverRepositoryTool,
@@ -29,67 +27,65 @@ const toolRegistry = {
 
 };
 
-
-
-
 export async function toolNode(state) {
 
-
-    console.log(
-        "🔧 TOOL NODE"
-    );
-
+    console.log("================================");
+    console.log("🔧 TOOL NODE");
+    console.log("================================");
 
     console.log(
         "STATE PLAN:",
-        JSON.stringify(state.plan, null, 2)
+        JSON.stringify(
+            state.plan,
+            null,
+            2
+        )
     );
-
 
     console.log(
         "STATE TOOLS:",
-        JSON.stringify(state.tools, null, 2)
+        JSON.stringify(
+            state.tools,
+            null,
+            2
+        )
     );
 
+    //-----------------------------------------
+    // Developer
+    //-----------------------------------------
 
+    let selectedTool =
+        state.tools?.[0];
 
-    // --------------------------------
-    // Support both architectures
-    // Developer:
-    // state.tools[0]
-    //
-    // Local/Day:
-    // state.plan
-    // --------------------------------
-
-    const selectedTool =
-        state.tools?.[0]
-        ||
-        (
-            state.plan
-                ? {
-                    name:
-                        state.plan.tool,
-
-                    input:
-                        state.plan.input
-                }
-                : null
-        );
-
-
-
+    //-----------------------------------------
+    // Local / Day
+    //-----------------------------------------
 
     if (
-        !selectedTool ||
-        !selectedTool.name
+        !selectedTool &&
+        state.plan?.tool
     ) {
 
+        selectedTool = {
+
+            name:
+                state.plan.tool,
+
+            input:
+                state.plan.input || {}
+
+        };
+
+    }
+
+    if (
+        !selectedTool
+    ) {
 
         console.log(
-            "❌ No tool selected"
+            "❌ No tool selected."
         );
-
 
         return {
 
@@ -101,36 +97,36 @@ export async function toolNode(state) {
 
     }
 
-
-
-
     console.log(
-        "📋 SELECTED TOOL:",
-        JSON.stringify(
-            selectedTool,
-            null,
-            2
-        )
+        "📋 SELECTED TOOL:"
     );
 
+    console.log(
 
+        JSON.stringify(
 
+            selectedTool,
+
+            null,
+
+            2
+
+        )
+
+    );
 
     const tool =
-        toolRegistry[selectedTool.name];
-
-
-
+        toolRegistry[
+            selectedTool.name
+        ];
 
     if (!tool) {
-
 
         console.log(
             "❌ Tool not registered:",
             selectedTool.name
         );
 
-
         return {
 
             ...state,
@@ -141,49 +137,58 @@ export async function toolNode(state) {
 
     }
 
-
-
-
     try {
-
 
         const safeInput = {
 
             ...(selectedTool.input || {}),
 
-            github: selectedTool.input?.github
-                ? {
-                    owner: selectedTool.input.github.owner,
-                    repo: selectedTool.input.github.repo,
-                    token: "***"
-                }
-                : undefined
+            github:
+                selectedTool.input?.github
+                    ? {
+
+                        owner:
+                            selectedTool.input.github.owner,
+
+                        repo:
+                            selectedTool.input.github.repo,
+
+                        token:
+                            "***"
+
+                    }
+                    : undefined
 
         };
 
-        console.log("🚀 Executing Tool:", tool.name);
-        console.log("📥 Tool Input:", JSON.stringify(safeInput, null, 2));
-
-
-
-        let result;
-
-        console.log("📤 Tool Result:");
-
         console.log(
-            JSON.stringify(
-                result,
-                null,
-                2
-            )
+            "🚀 Executing Tool:",
+            tool.name
         );
 
-        console.log("--------------------------------");
+        console.log(
+            "📥 Tool Input:"
+        );
 
-        // Function style tool
+        console.log(
+
+            JSON.stringify(
+
+                safeInput,
+
+                null,
+
+                2
+
+            )
+
+        );
+
+        let result;        //-----------------------------------------
+        // Execute Tool
+        //-----------------------------------------
 
         if (typeof tool === "function") {
-
 
             result =
                 await tool(
@@ -191,10 +196,10 @@ export async function toolNode(state) {
                     state.context || {}
                 );
 
-
         }
-        else if (typeof tool.execute === "function") {
-
+        else if (
+            typeof tool.execute === "function"
+        ) {
 
             result =
                 await tool.execute(
@@ -202,10 +207,10 @@ export async function toolNode(state) {
                     state.context || {}
                 );
 
-
         }
-        else if (typeof tool.invoke === "function") {
-
+        else if (
+            typeof tool.invoke === "function"
+        ) {
 
             result =
                 await tool.invoke(
@@ -213,107 +218,158 @@ export async function toolNode(state) {
                     state.context || {}
                 );
 
-
         }
         else {
 
-
-            console.log(
-                "INVALID TOOL OBJECT:",
-                tool
-            );
-
-
             throw new Error(
-                "Invalid tool format"
+                "Invalid tool implementation."
             );
-
 
         }
 
+        //-----------------------------------------
+        // Log Result
+        //-----------------------------------------
 
+        console.log(
+            "📤 Tool Result:"
+        );
 
+        console.log(
+
+            JSON.stringify(
+
+                result,
+
+                null,
+
+                2
+
+            )
+
+        );
+
+        console.log(
+            "--------------------------------"
+        );
+
+        //-----------------------------------------
+        // Save Evidence
+        //-----------------------------------------
 
         const evidence =
+
             Array.isArray(state.evidence)
+
                 ? [
+
                     ...state.evidence,
+
                     {
+
                         tool:
-                            tool.name,
+                            selectedTool.name,
 
                         result
+
                     }
+
                 ]
+
                 : [
+
                     {
+
                         tool:
-                            tool.name,
+                            selectedTool.name,
 
                         result
+
                     }
+
                 ];
 
-
-
-
+        //-----------------------------------------
+        // Return
+        //-----------------------------------------
 
         return {
 
-
             ...state,
-
 
             evidence,
 
-
-            // clear previous execution
-
-            plan: null,
-
-
-            tools: [],
-
-
             toolResults: {
 
-                tool: tool.name,
+                tool:
+                    selectedTool.name,
 
-                success: result?.success,
+                success:
+                    result?.success,
 
-                data: result?.data,
+                data:
+                    result?.data,
 
-                error: result?.error
+                error:
+                    result?.error
 
             },
 
+            plan: null,
 
-            action: "tool_completed"
+            tools: [],
 
+            action: "tool"
 
         };
-
-
 
     }
     catch (error) {
 
+        console.error(
+            "================================"
+        );
 
-        console.error("❌ TOOL ERROR");
+        console.error(
+            "❌ TOOL ERROR"
+        );
+
         console.error(error);
 
-
+        console.error(
+            "================================"
+        );
 
         return {
 
             ...state,
 
-            action: "finish"
+            evidence: [
+
+                ...(state.evidence || []),
+
+                {
+
+                    tool:
+                        selectedTool?.name || "unknown",
+
+                    result: {
+
+                        success: false,
+
+                        error:
+                            error.message
+
+                    }
+
+                }
+
+            ],
+
+            action: "final"
 
         };
 
-
     }
-
 
 }
