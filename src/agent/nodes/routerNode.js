@@ -4,35 +4,39 @@ export async function routerNode(state) {
         state.iteration || 0;
 
 
-    console.log(
-        `🧭 Router | Iteration: ${iteration} | Action: ${state.action}`
-    );
+    console.log("================================");
+console.log("🧭 ROUTER");
+console.log("Iteration :", iteration);
+console.log("Action    :", state.action);
+console.log("================================");
 
 
-    if(iteration >= 5){
+    if (iteration >= 5) {
 
         return {
 
             ...state,
 
-            action:"final",
+            action: "final",
 
-            route:"final"
+            route: "final"
 
         };
 
     }
 
 
-    switch(state.action){
+    switch (state.action) {
 
         case "tool":
+
+        case "tool_completed":
 
             return {
 
                 ...state,
 
-                route:"tool"
+                route: "tool"
 
             };
 
@@ -45,9 +49,9 @@ export async function routerNode(state) {
 
                 ...state,
 
-                action:"final",
+                action: "final",
 
-                route:"final"
+                route: "final"
 
             };
 
@@ -58,9 +62,9 @@ export async function routerNode(state) {
 
                 ...state,
 
-                action:"final",
+                action: "final",
 
-                route:"final"
+                route: "final"
 
             };
 

@@ -6,7 +6,17 @@ export async function plannerNode(state) {
 
     const evidence =
         state.evidence || [];
-
+    console.log("================================");
+    console.log("🧠 PLANNER");
+    console.log("Iteration:", (state.iteration || 0) + 1);
+    console.log(
+        "Evidence:",
+        evidence.map(e => ({
+            tool: e.tool,
+            success: e.result?.success
+        }))
+    );
+    console.log("================================");
 
     const iteration =
         (state.iteration || 0) + 1;
@@ -29,12 +39,31 @@ export async function plannerNode(state) {
             "🧠 Planner Action: final (max iterations)"
         );
 
+        if (action === "final") {
+
+            console.log(
+                "✅ Planner completed. Sending to response."
+            );
+
+        }
 
         return {
 
             ...state,
 
             iteration,
+
+            action,
+
+            tools
+
+        };
+        return {
+
+            ...state,
+
+            iteration,
+
 
             action: "final",
 
@@ -96,11 +125,29 @@ export async function plannerNode(state) {
 
 
 
-    const discovery =
-        evidence.find(
-            e =>
-                e.tool === "discoverRepositoryTool"
-        )?.result?.data;
+    if (discovery && !discovery.success) {
+
+        console.log(
+            "❌ Repository discovery failed:",
+            discovery.error
+        );
+
+        return {
+
+            ...state,
+
+            iteration,
+
+            action: "final",
+
+            tools: []
+
+        };
+
+    }
+
+    const repository =
+        repository?.data;
 
 
 
@@ -147,9 +194,12 @@ export async function plannerNode(state) {
 
 
     const recommendedFiles =
-        discovery?.recommendedFiles || [];
+        repository?.recommendedFiles || [];
 
-
+    console.log(
+        "📄 Recommended Files:",
+        recommendedFiles
+    );
 
     let nextFile =
         recommendedFiles.find(
@@ -171,9 +221,12 @@ export async function plannerNode(state) {
 
 
         const rootFiles =
-            discovery?.rootFiles || [];
+            repository?.rootFiles || [];
 
-
+        console.log(
+            "📁 Root Files:",
+            rootFiles
+        );
 
         const preferredRootFiles = [
 
@@ -297,11 +350,10 @@ Return ONLY JSON.
  "action":"tool",
  "tools":[
    {
-    "name":"readFileTool",
-    "input":{
-    "github": "...",
-    "filePath":"..."
-}
+     "name":"readFileTool",
+     "input":{
+       "filePath":"..."
+     }
    }
  ]
 }
@@ -402,10 +454,10 @@ or
 
                     input: {
 
-                        github:
-                            state.context?.github,
+                        ...tool.input,
 
-                        ...tool.input
+                        github:
+                            state.context?.github
 
                     }
 

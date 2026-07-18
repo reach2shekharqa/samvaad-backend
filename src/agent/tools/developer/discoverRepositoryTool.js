@@ -1,33 +1,43 @@
 import axios from "axios";
 import discoveryCache from "../DiscoveryCache.js";
 
-
 const PRIORITY_FILES = [
 
     "README.md",
     "readme.md",
     "README.txt",
+
     "package.json",
+
     "pom.xml",
+
     "build.gradle",
     "build.gradle.kts",
+
     "settings.gradle",
     "settings.gradle.kts",
+
     "requirements.txt",
     "pyproject.toml",
     "setup.py",
+
     "composer.json",
+
     "Cargo.toml",
+
     "go.mod",
+
     "pubspec.yaml",
+
     "Gemfile",
+
     "Makefile",
+
     "Dockerfile",
+
     "docker-compose.yml"
 
 ];
-
-
 
 export const discoverRepositoryTool = {
 
@@ -40,59 +50,84 @@ export const discoverRepositoryTool = {
 
 };
 
-
-
 async function execute({ github }) {
 
+    // ------------------------------------
+    // Validate Input
+    // ------------------------------------
 
-    try {
+    if (
+        !github ||
+        !github.owner ||
+        !github.repo ||
+        !github.token
+    ) {
 
+        return {
 
-        console.log(
-            "DEBUG: Discovering repo:",
+            success: false,
+
+            tool: "discoverRepositoryTool",
+
+            error: "Invalid GitHub context."
+
+        };
+
+    }
+
+    console.log("================================");
+    console.log("📦 DISCOVER REPOSITORY");
+    console.log(
+        "Repository:",
+        `${github.owner}/${github.repo}`
+    );
+    console.log("================================");
+
+    // ------------------------------------
+    // Cache
+    // ------------------------------------
+
+    const cached =
+        discoveryCache.get(
             github.owner,
-            "/",
             github.repo
         );
 
+    if (cached) {
 
+        console.log(
+            `✅ CACHE HIT: ${github.owner}/${github.repo}`
+        );
 
-        // ---------------- CACHE ----------------
+        return {
 
-        const cached =
-            discoveryCache.get(
-                github.owner,
-                github.repo
-            );
+            success: true,
 
+            tool: "discoverRepositoryTool",
 
-        if (cached) {
+            fromCache: true,
 
+            data: cached
 
-            console.log(
-                "✅ CACHE HIT:",
-                `${github.owner}/${github.repo}`
-            );
+        };
 
+    }
 
-            return {
+    try {
 
-                success: true,
+        const headers = {
 
-                tool: "discoverRepositoryTool",
+            Authorization:
+                `Bearer ${github.token}`,
 
-                fromCache: true,
+            Accept:
+                "application/vnd.github+json"
 
-                data: cached
+        };
 
-            };
-
-        }
-
-
-
-        // ---------------- REPO INFO ----------------
-
+        // ------------------------------------
+        // Repository Information
+        // ------------------------------------
 
         const repoResponse =
             await axios.get(
@@ -100,30 +135,17 @@ async function execute({ github }) {
                 `https://api.github.com/repos/${github.owner}/${github.repo}`,
 
                 {
-
-                    headers: {
-
-                        Authorization:
-                            `Bearer ${github.token}`,
-
-                        Accept:
-                            "application/vnd.github+json"
-
-                    }
-
+                    headers
                 }
 
             );
 
-
-
         const defaultBranch =
             repoResponse.data.default_branch || "main";
 
-
-
-        // ---------------- TREE ----------------
-
+        // ------------------------------------
+        // Repository Tree
+        // ------------------------------------
 
         const treeResponse =
             await axios.get(
@@ -131,27 +153,13 @@ async function execute({ github }) {
                 `https://api.github.com/repos/${github.owner}/${github.repo}/git/trees/${defaultBranch}?recursive=1`,
 
                 {
-
-                    headers: {
-
-                        Authorization:
-                            `Bearer ${github.token}`,
-
-                        Accept:
-                            "application/vnd.github+json"
-
-                    }
-
+                    headers
                 }
 
             );
 
-
-
         const tree =
             treeResponse.data.tree || [];
-
-
 
         const files = [];
 
@@ -159,17 +167,12 @@ async function execute({ github }) {
 
         const rootFiles = [];
 
-
-
         for (const item of tree) {
-
 
             if (item.type === "blob") {
 
                 files.push(item.path);
 
-
-                // root level file only
                 if (!item.path.includes("/")) {
 
                     rootFiles.push(item.path);
@@ -177,8 +180,6 @@ async function execute({ github }) {
                 }
 
             }
-
-
 
             if (item.type === "tree") {
 
@@ -188,17 +189,13 @@ async function execute({ github }) {
 
         }
 
-
-
-        // ---------------- IMPORTANT FILES ----------------
-
+        // ------------------------------------
+        // Priority Files
+        // ------------------------------------
 
         const recommendedFiles = [];
 
-
-
         for (const file of PRIORITY_FILES) {
-
 
             const match =
                 files.find(
@@ -209,79 +206,87 @@ async function execute({ github }) {
 
                 );
 
-
             if (match) {
 
                 recommendedFiles.push(match);
 
             }
 
-        }
-
-
-
+        }        // ------------------------------------
+        // Build Discovery Data
+        // ------------------------------------
 
         const data = {
-
 
             owner:
                 github.owner,
 
-
             repository:
                 github.repo,
 
-
             defaultBranch,
-
 
             totalFiles:
                 files.length,
 
-
             totalDirectories:
                 directories.length,
 
-
             files,
-
 
             rootFiles,
 
-
             directories,
-
 
             recommendedFiles,
 
-
             repositoryInfo: {
 
+                name:
+                    repoResponse.data.name,
+
+                fullName:
+                    repoResponse.data.full_name,
 
                 description:
                     repoResponse.data.description,
 
-
                 language:
                     repoResponse.data.language,
-
 
                 visibility:
                     repoResponse.data.visibility,
 
-
                 stars:
                     repoResponse.data.stargazers_count,
 
-
                 forks:
-                    repoResponse.data.forks_count
+                    repoResponse.data.forks_count,
+
+                watchers:
+                    repoResponse.data.watchers_count,
+
+                openIssues:
+                    repoResponse.data.open_issues_count,
+
+                defaultBranch,
+
+                homepage:
+                    repoResponse.data.homepage,
+
+                topics:
+                    repoResponse.data.topics || [],
+
+                license:
+                    repoResponse.data.license?.name || null
 
             }
 
         };
 
-
+        // ------------------------------------
+        // Cache
+        // ------------------------------------
 
         discoveryCache.set(
 
@@ -293,51 +298,59 @@ async function execute({ github }) {
 
         );
 
-
-
         console.log(
             `💾 CACHE SET: ${github.owner}/${github.repo}`
         );
 
+        console.log("📊 Repository Summary");
 
+        console.log(
+            "Files       :",
+            files.length
+        );
+
+        console.log(
+            "Directories :",
+            directories.length
+        );
+
+        console.log(
+            "Recommended :",
+            recommendedFiles.length
+        );
 
         return {
 
-
             success: true,
 
+            tool: "discoverRepositoryTool",
 
-            tool:
-                "discoverRepositoryTool",
-
-
-            fromCache:
-                false,
-
+            fromCache: false,
 
             data
 
         };
 
+    }
+    catch (err) {
 
+        console.error(
+            "❌ DISCOVERY ERROR"
+        );
 
-    } catch(err) {
-
+        console.error(
+            err.response?.data || err.message
+        );
 
         return {
 
+            success: false,
 
-            success:false,
-
-
-            tool:
-                "discoverRepositoryTool",
-
+            tool: "discoverRepositoryTool",
 
             error:
                 err.response?.data?.message ||
                 err.message
-
 
         };
 
@@ -345,13 +358,13 @@ async function execute({ github }) {
 
 }
 
-
-
 export default {
+
     name: "discoverRepositoryTool",
 
     description:
         "Discover repository structure and important files.",
 
     execute
+
 };

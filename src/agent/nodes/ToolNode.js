@@ -95,7 +95,7 @@ export async function toolNode(state) {
 
             ...state,
 
-            action:"finish"
+            action: "finish"
 
         };
 
@@ -135,7 +135,7 @@ export async function toolNode(state) {
 
             ...state,
 
-            action:"finish"
+            action: "finish"
 
         };
 
@@ -147,67 +147,89 @@ export async function toolNode(state) {
     try {
 
 
-        console.log(
-            "🚀 Executing:",
-            tool.name
-        );
+        const safeInput = {
+
+            ...(selectedTool.input || {}),
+
+            github: selectedTool.input?.github
+                ? {
+                    owner: selectedTool.input.github.owner,
+                    repo: selectedTool.input.github.repo,
+                    token: "***"
+                }
+                : undefined
+
+        };
+
+        console.log("🚀 Executing Tool:", tool.name);
+        console.log("📥 Tool Input:", JSON.stringify(safeInput, null, 2));
 
 
 
         let result;
 
+        console.log("📤 Tool Result:");
 
+        console.log(
+            JSON.stringify(
+                result,
+                null,
+                2
+            )
+        );
+
+        console.log("--------------------------------");
 
         // Function style tool
 
         if (typeof tool === "function") {
 
 
-    result =
-        await tool(
-            selectedTool.input,
-            state.context || {}
-        );
+            result =
+                await tool(
+                    selectedTool.input,
+                    state.context || {}
+                );
 
 
-}
-else if (typeof tool.execute === "function") {
+        }
+        else if (typeof tool.execute === "function") {
 
 
-    result =
-        await tool.execute(
-            selectedTool.input,
-            state.context || {}
-        );
+            result =
+                await tool.execute(
+                    selectedTool.input,
+                    state.context || {}
+                );
 
 
-}
-else if (typeof tool.invoke === "function") {
+        }
+        else if (typeof tool.invoke === "function") {
 
 
-    result =
-        await tool.invoke(
-            selectedTool.input,
-            state.context || {}
-        );
+            result =
+                await tool.invoke(
+                    selectedTool.input,
+                    state.context || {}
+                );
 
 
-}
-else {
+        }
+        else {
 
 
-    console.log(
-        "INVALID TOOL OBJECT:",
-        tool
-    );
+            console.log(
+                "INVALID TOOL OBJECT:",
+                tool
+            );
 
 
-    throw new Error(
-        "Invalid tool format"
-    );
+            throw new Error(
+                "Invalid tool format"
+            );
 
 
-}
+        }
 
 
 
@@ -247,17 +269,26 @@ else {
 
             // clear previous execution
 
-            plan:null,
+            plan: null,
 
 
-            tools:[],
+            tools: [],
 
 
-            toolResults:
-                result,
+            toolResults: {
+
+                tool: tool.name,
+
+                success: result?.success,
+
+                data: result?.data,
+
+                error: result?.error
+
+            },
 
 
-            action:"planner"
+            action: "tool_completed"
 
 
         };
@@ -265,13 +296,11 @@ else {
 
 
     }
-    catch(error) {
+    catch (error) {
 
 
-        console.error(
-            "❌ TOOL ERROR:",
-            error.message
-        );
+        console.error("❌ TOOL ERROR");
+        console.error(error);
 
 
 
@@ -279,7 +308,7 @@ else {
 
             ...state,
 
-            action:"finish"
+            action: "finish"
 
         };
 
