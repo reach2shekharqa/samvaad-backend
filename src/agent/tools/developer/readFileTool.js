@@ -51,23 +51,13 @@ async function execute({ github, filePath }) {
 
         const response =
             await axios.get(
-
                 `https://api.github.com/repos/${github.owner}/${github.repo}/contents/${filePath}`,
-
                 {
-
                     headers: {
-
-                        Authorization:
-                            `Bearer ${github.token}`,
-
-                        Accept:
-                            "application/vnd.github+json"
-
+                        Authorization: `token ${github.token}`,
+                        Accept: "application/vnd.github+json"
                     }
-
                 }
-
             );
 
         // ------------------------------------

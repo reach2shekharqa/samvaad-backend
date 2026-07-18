@@ -77,9 +77,7 @@ export async function evidenceBuilderNode(state) {
 
 
 
-        case "readFileTool":
-
-
+        case "readFileTool": {
             const content =
                 state.toolResults?.data?.content || "";
 
@@ -108,6 +106,7 @@ export async function evidenceBuilderNode(state) {
 
 
             break;
+        }
 
 
 
@@ -150,10 +149,4 @@ export async function evidenceBuilderNode(state) {
 
     };
 
-
-
 }
-console.log(
-    "CURRENT EVIDENCE:",
-    JSON.stringify(state.evidence, null, 2)
-);

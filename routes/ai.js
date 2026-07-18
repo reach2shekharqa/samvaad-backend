@@ -91,7 +91,7 @@ router.post("/chat", async (req, res) => {
       // -----------------------------
       // DYNAMIC INTENT DETECTION (LLM)
       // -----------------------------
-      async function detectIntent(text) {
+      const detectIntent = async (text) => {
         try {
           const result = await aiService.chat({
             systemPrompt: `
@@ -157,7 +157,7 @@ Rules:
           console.warn("Intent detection failed, falling back to static check:", e && e.message ? e.message : e);
           return { intent: null, confidence: 0 };
         }
-      }
+      };
 
       // If LLM classifies the input as a greeting or smalltalk, produce a dynamic quick reply
       const intentResult = await detectIntent(userQuestion);
@@ -309,7 +309,7 @@ Rules:
         const shouldParaphrase =
           detectedConfidence < 0.6 ||
           rawQuestion.trim().length < 4 ||
-          /[^\w\s\?\.\!\-]/.test(rawQuestion);
+          /[^\w\s?.!-]/.test(rawQuestion);
 
 
 
