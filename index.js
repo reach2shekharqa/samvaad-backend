@@ -46,7 +46,9 @@ app.use((req, res, next) => {
         try {
             if (safeBody.github && safeBody.github.token) safeBody.github.token = "***REDACTED***";
             if (safeBody.token) safeBody.token = "***REDACTED***";
-        } catch (e) { }
+        } catch (e) {
+            // Safely ignore parse errors
+        }
 
         console.log("\n🔥 AI REQUEST:", req.method, req.url);
         console.log("BODY:", safeBody);

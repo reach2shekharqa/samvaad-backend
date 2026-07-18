@@ -29,9 +29,7 @@ console.log("================================");
     switch (state.action) {
 
         case "tool":
-
         case "tool_completed":
-
             return {
 
                 ...state,
@@ -42,9 +40,7 @@ console.log("================================");
 
 
         case "finish":
-
         case "final":
-
             return {
 
                 ...state,
@@ -57,7 +53,6 @@ console.log("================================");
 
 
         default:
-
             return {
 
                 ...state,
